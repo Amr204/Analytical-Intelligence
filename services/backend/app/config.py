@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     # Database
-    database_url: str = "postgresql+asyncpg://siem:siempass123@localhost:5432/minisiem"
+    database_url: str = "postgresql+asyncpg://siem:siempass123@postgres:5432/minisiem"
     
     # Security
     ingest_api_key: str = "test-api-key-12345"

@@ -1,9 +1,9 @@
 {
   "columns_to_clip": [
-    "Flow Duration",
-    "Flow Bytes/s",
-    "Flow Packets/s"
-  ],
+  "FlowDuration",
+  "FlowBytes/s",
+  "FlowPackets/s"
+],
   "constant_cols_dropped": [
     "BwdPSHFlags",
     "BwdURGFlags",

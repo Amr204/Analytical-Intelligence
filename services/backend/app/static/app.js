@@ -4,7 +4,7 @@
  */
 
 // Configuration
-const POLL_INTERVAL = 2000; // 2 seconds
+const POLL_INTERVAL = 1000; // 1 second
 const API_BASE = '';
 
 // State

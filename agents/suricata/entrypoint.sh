@@ -22,4 +22,6 @@ mkdir -p /var/log/suricata
 
 # Start Suricata
 echo "Starting Suricata on ${NET_IFACE}..."
-exec suricata -c /etc/suricata/suricata.yaml -i "${NET_IFACE}" --af-packet="${NET_IFACE}" -v
+exec suricata -c /etc/suricata/suricata.yaml --af-packet="${NET_IFACE}" -v
+
+# exec suricata -c /etc/suricata/suricata.yaml -i "${NET_IFACE}" --af-packet="${NET_IFACE}" -v

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <h1>Security Dashboard</h1>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">📊</div>
+            <div class="stat-content">
+                <span class="stat-value" id="total-events">{{ stats.total_events }}</span>
+                <span class="stat-label">Total Events</span>
+            </div>
+        </div>
+        <div class="stat-card alert-card">
+            <div class="stat-icon">🚨</div>
+            <div class="stat-content">
+                <span class="stat-value" id="total-detections">{{ stats.total_detections }}</span>
+                <span class="stat-label">Total Detections</span>
+            </div>
+        </div>
+        <div class="stat-card warning-card">
+            <div class="stat-icon">⏰</div>
+            <div class="stat-content">
+                <span class="stat-value" id="detections-24h">{{ stats.detections_24h }}</span>
+                <span class="stat-label">Detections (24h)</span>
+            </div>
+        </div>
+        <div class="stat-card info-card">
+            <div class="stat-icon">🖥️</div>
+            <div class="stat-content">
+                <span class="stat-value" id="total-devices">{{ stats.total_devices }}</span>
+                <span class="stat-label">Devices</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Severity Breakdown -->
+    <div class="section-row">
+        <div class="section-card">
+            <h2>Detections by Severity</h2>
+            <div class="severity-bars">
+                {% set severity_colors = {'CRITICAL': 'critical', 'HIGH': 'high', 'MEDIUM': 'medium', 'LOW': 'low'} %}
+                {% for severity, count in stats.detections_by_severity.items() %}
+                <div class="severity-row">
+                    <span class="severity-badge {{ severity_colors.get(severity, 'low') }}">{{ severity }}</span>
+                    <div class="severity-bar-container">
+                        <div class="severity-bar {{ severity_colors.get(severity, 'low') }}"
+                            style="width: {{ (count / (stats.total_detections or 1)) * 100 }}%"></div>
+                    </div>
+                    <span class="severity-count">{{ count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h2>Events by Type</h2>
+            <div class="type-breakdown">
+                {% for event_type, count in stats.events_by_type.items() %}
+                <div class="type-item">
+                    <span class="type-badge {{ event_type }}">{{ event_type }}</span>
+                    <span class="type-count">{{ count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h2>Detections by Model</h2>
+            <div class="model-breakdown">
+                {% for model, count in stats.detections_by_model.items() %}
+                <div class="model-item">
+                    <span class="model-badge {{ model }}">{{ model }}</span>
+                    <span class="model-count">{{ count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Alerts -->
+    <div class="section-card full-width">
+        <div class="section-header">
+            <h2>Recent Alerts</h2>
+            <a href="/alerts" class="btn btn-secondary">View All</a>
+        </div>
+        <div class="alerts-table-container" id="recent-alerts">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Severity</th>
+                        <th>Model</th>
+                        <th>Label</th>
+                        <th>Device</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in detections %}
+                    <tr class="severity-row-{{ d.severity|lower }}">
+                        <td class="timestamp">{{ d.ts[:19] }}</td>
+                        <td><span class="severity-badge {{ d.severity|lower }}">{{ d.severity }}</span></td>
+                        <td><span class="model-badge {{ d.model_name }}">{{ d.model_name }}</span></td>
+                        <td class="label-cell" title="{{ d.label }}">{{ d.label[:50] }}{% if d.label|length > 50 %}...{%
+                            endif %}</td>
+                        <td>{{ d.device_id }}</td>
+                        <td>{{ "%.2f"|format(d.score) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="empty-state">No recent alerts</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

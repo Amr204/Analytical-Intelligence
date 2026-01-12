@@ -1,0 +1,84 @@
+version: "3.8"
+
+services:
+  # Auth Log Collector - tails /var/log/auth.log
+  auth_collector:
+    build:
+      context: ./agents/auth_collector
+      dockerfile: Dockerfile
+    container_name: minisiem-auth-collector
+    restart: unless-stopped
+    environment:
+      ANALYZER_URL: ${ANALYZER_URL:-http://192.168.1.20:8000}
+      X_API_KEY: ${X_API_KEY:-test-api-key-12345}
+      DEVICE_ID: ${DEVICE_ID:-sensor-01}
+      HOSTNAME: ${HOSTNAME:-sensor-server}
+      DEVICE_IP: ${DEVICE_IP:-192.168.1.10}
+    volumes:
+      - /var/log/auth.log:/var/log/auth.log:ro
+    networks:
+      - sensor-network
+
+  # Suricata IDS - Real-time packet capture
+  suricata:
+    build:
+      context: ./agents/suricata
+      dockerfile: Dockerfile
+    container_name: minisiem-suricata
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+    environment:
+      NET_IFACE: ${NET_IFACE:-ens33}
+    volumes:
+      - ./data/suricata:/var/log/suricata
+      - ./agents/suricata/suricata.yaml:/etc/suricata/suricata.yaml:ro
+
+  # Suricata Shipper - tails eve.json and ships to backend
+  suricata_shipper:
+    build:
+      context: ./agents/suricata_shipper
+      dockerfile: Dockerfile
+    container_name: minisiem-suricata-shipper
+    restart: unless-stopped
+    environment:
+      ANALYZER_URL: ${ANALYZER_URL:-http://192.168.1.20:8000}
+      X_API_KEY: ${X_API_KEY:-test-api-key-12345}
+      DEVICE_ID: ${DEVICE_ID:-sensor-01}
+      HOSTNAME: ${HOSTNAME:-sensor-server}
+      DEVICE_IP: ${DEVICE_IP:-192.168.1.10}
+      EVE_JSON_PATH: /var/log/suricata/eve.json
+    volumes:
+      - ./data/suricata:/var/log/suricata:ro
+    depends_on:
+      - suricata
+    networks:
+      - sensor-network
+
+  # Flow Collector - NFStream packet capture
+  flow_collector:
+    build:
+      context: ./agents/flow_collector
+      dockerfile: Dockerfile
+    container_name: minisiem-flow-collector
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      ANALYZER_URL: ${ANALYZER_URL:-http://192.168.1.20:8000}
+      X_API_KEY: ${X_API_KEY:-test-api-key-12345}
+      DEVICE_ID: ${DEVICE_ID:-sensor-01}
+      HOSTNAME: ${HOSTNAME:-sensor-server}
+      DEVICE_IP: ${DEVICE_IP:-192.168.1.10}
+      NET_IFACE: ${NET_IFACE:-ens33}
+      FLOW_IDLE_TIMEOUT: ${FLOW_IDLE_TIMEOUT:-2}
+      FLOW_ACTIVE_TIMEOUT: ${FLOW_ACTIVE_TIMEOUT:-5}
+
+networks:
+  sensor-network:
+    driver: bridge

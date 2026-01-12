@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-content">
+    <div class="page-header">
+        <h1>🌐 Flow Events</h1>
+        <p class="subtitle">Network flow records captured by NFStream</p>
+    </div>
+
+    <div class="results-info">
+        <span>Showing {{ events|length }} latest flows</span>
+    </div>
+
+    <div class="section-card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Timestamp</th>
+                    <th>Device</th>
+                    <th>Source</th>
+                    <th>Destination</th>
+                    <th>Protocol</th>
+                    <th>Bytes</th>
+                    <th>Packets</th>
+                    <th>Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in events %}
+                {% set f = e.payload %}
+                <tr>
+                    <td>{{ e.id }}</td>
+                    <td class="timestamp">{{ e.ts[:19] }}</td>
+                    <td>{{ e.device_id }}</td>
+                    <td>{{ f.get('src_ip', '?') }}:{{ f.get('src_port', '?') }}</td>
+                    <td>{{ f.get('dst_ip', '?') }}:{{ f.get('dst_port', '?') }}</td>
+                    <td>
+                        {% if f.get('protocol') == 6 %}TCP{% elif f.get('protocol') == 17 %}UDP{% else %}{{
+                        f.get('protocol', '?') }}{% endif %}
+                    </td>
+                    <td>{{ f.get('bidirectional_bytes', f.get('total_bytes', '?')) }}</td>
+                    <td>{{ f.get('bidirectional_packets', f.get('total_packets', '?')) }}</td>
+                    <td>{{ f.get('bidirectional_duration_ms', f.get('duration_ms', '?')) }}ms</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="empty-state">No flow events found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

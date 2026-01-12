@@ -1,0 +1,67 @@
+{
+  "macro_f1": 0.979905323145297,
+  "weighted_f1": 0.9990869906350689,
+  "accuracy": 0.9990609111542592,
+  "per_class_metrics": {
+    "BENIGN": {
+      "precision": 0.9999554387059401,
+      "recall": 0.9990046840269275,
+      "f1-score": 0.9994798352652602,
+      "support": 314473
+    },
+    "Bot": {
+      "precision": 0.713216957605985,
+      "recall": 0.9761092150170648,
+      "f1-score": 0.8242074927953891,
+      "support": 293
+    },
+    "DDoS": {
+      "precision": 0.999635587485033,
+      "recall": 1.0,
+      "f1-score": 0.9998177605373461,
+      "support": 19202
+    },
+    "DoS GoldenEye": {
+      "precision": 0.9903536977491961,
+      "recall": 0.9980557355800389,
+      "f1-score": 0.9941897998708844,
+      "support": 1543
+    },
+    "DoS Hulk": {
+      "precision": 0.9980738857429022,
+      "recall": 0.9993057430477881,
+      "f1-score": 0.9986894345295455,
+      "support": 25927
+    },
+    "DoS Slowhttptest": {
+      "precision": 0.9873737373737373,
+      "recall": 0.9974489795918368,
+      "f1-score": 0.9923857868020305,
+      "support": 784
+    },
+    "DoS slowloris": {
+      "precision": 0.9962871287128713,
+      "recall": 0.9962871287128713,
+      "f1-score": 0.9962871287128713,
+      "support": 808
+    },
+    "FTP-Patator": {
+      "precision": 0.9988776655443322,
+      "recall": 1.0,
+      "f1-score": 0.9994385176866929,
+      "support": 890
+    },
+    "PortScan": {
+      "precision": 0.9898211429402356,
+      "recall": 0.9993393525655142,
+      "f1-score": 0.9945574752529496,
+      "support": 13623
+    },
+    "SSH-Patator": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 483
+    }
+  }
+}

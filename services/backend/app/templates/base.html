@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#000000">
+    <meta name="description" content="Mini-SIEM v1 - Real-time Security Intelligence Dashboard">
+    <title>{% block title %}{{ page_title }} - Mini-SIEM{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">🛡️</span>
+            <span class="brand-text">Mini-SIEM v1</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/" class="{% if page_title == 'Dashboard' %}active{% endif %}">Dashboard</a></li>
+            <li><a href="/alerts" class="{% if page_title == 'Alerts' %}active{% endif %}">Alerts</a></li>
+            <li class="dropdown">
+                <a href="#" class="dropdown-toggle {% if 'Events' in page_title %}active{% endif %}">Events ▾</a>
+                <ul class="dropdown-menu">
+                    <li><a href="/events/auth">Auth Events</a></li>
+                    <li><a href="/events/flows">Flow Events</a></li>
+                    <li><a href="/events/suricata">Suricata Events</a></li>
+                </ul>
+            </li>
+            <li><a href="/models" class="{% if page_title == 'Models' %}active{% endif %}">Models</a></li>
+        </ul>
+        <div class="nav-status">
+            <span class="status-indicator online"></span>
+            <span id="last-update">Last update: --</span>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <p>Mini-SIEM v1.0 | Real-time Security Intelligence</p>
+    </footer>
+
+    <script src="/static/app.js"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+
+</html>

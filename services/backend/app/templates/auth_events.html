@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-content">
+    <div class="page-header">
+        <h1>🔐 Auth Events</h1>
+        <p class="subtitle">Raw authentication log events from /var/log/auth.log</p>
+    </div>
+
+    <div class="results-info">
+        <span>Showing {{ events|length }} latest events</span>
+    </div>
+
+    <div class="section-card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Timestamp</th>
+                    <th>Device</th>
+                    <th>Log Line</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in events %}
+                <tr>
+                    <td>{{ e.id }}</td>
+                    <td class="timestamp">{{ e.ts[:19] }}</td>
+                    <td>{{ e.device_id }}</td>
+                    <td class="log-line">
+                        <code>{{ e.payload.get('line', '')[:150] }}{% if e.payload.get('line', '')|length > 150 %}...{% endif %}</code>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="empty-state">No auth events found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

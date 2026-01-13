@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - SSH LSTM Detector
+Analytical-Intelligencel-Intelligence v1 - SSH LSTM Detector
 Detects SSH brute force and anomalous authentication patterns.
 """
 

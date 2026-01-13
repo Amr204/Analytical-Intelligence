@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Auth Event Ingestion
+Analytical-Intelligence v1 - Auth Event Ingestion
 """
 
 import logging
@@ -74,13 +74,16 @@ async def ingest_auth_event(
             )
             logger.info(f"SSH detection: {detection['label']} from {payload.device_id}")
         
+        await session.commit()
+
         return IngestResponse(
             status="accepted",
             event_id=event_id,
             detection_id=detection_id,
             message="Auth event processed"
         )
-        
+
     except Exception as e:
+        await session.rollback()
         logger.error(f"Auth ingestion error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

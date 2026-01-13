@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Main Application
+Analytical-Intelligence v1 - Main Application
 FastAPI backend with Jinja2 templates
 """
 
@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
     logger.info("=" * 50)
-    logger.info("Mini-SIEM v1 Starting...")
+    logger.info("Analytical-Intelligence v1 Starting...")
     logger.info("=" * 50)
     
     # Load ML models
@@ -51,12 +51,12 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    logger.info("Mini-SIEM v1 Shutting down...")
+    logger.info("Analytical-Intelligence v1 Shutting down...")
 
 
 # Create FastAPI app
 app = FastAPI(
-    title="Mini-SIEM v1",
+    title="Analytical-Intelligence v1",
     description="Real-time Security Information and Event Management",
     version="1.0.0",
     lifespan=lifespan

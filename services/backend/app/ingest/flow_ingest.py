@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Flow Event Ingestion
+Analytical-Intelligence v1 - Flow Event Ingestion
 """
 
 import logging
@@ -68,13 +68,16 @@ async def ingest_flow_event(
             )
             logger.info(f"Network ML detection: {detection['label']} ({detection['severity']})")
         
+        await session.commit()
+
         return IngestResponse(
             status="accepted",
             event_id=event_id,
             detection_id=detection_id,
             message="Flow event processed"
         )
-        
+
     except Exception as e:
+        await session.rollback()
         logger.error(f"Flow ingestion error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - UI Routes
+Analytical-Intelligence v1 - UI Routes
 Server-rendered HTML pages using Jinja2 templates.
 """
 

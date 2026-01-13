@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Detectors Package
+Analytical-Intelligence v1 - Detectors Package
 """
 
 from app.detectors.severity import (

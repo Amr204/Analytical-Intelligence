@@ -1,5 +1,5 @@
 -- =====================================================
--- Mini-SIEM v1 - Database Schema
+-- Analytical-Intelligence v1 - Database Schema
 -- =====================================================
 
 -- Devices table - registered sensor devices
@@ -44,7 +44,5 @@ CREATE INDEX IF NOT EXISTS idx_detections_severity ON detections(severity);
 CREATE INDEX IF NOT EXISTS idx_detections_model_name ON detections(model_name);
 CREATE INDEX IF NOT EXISTS idx_detections_device_id ON detections(device_id);
 
--- Insert default device if not exists (for testing)
-INSERT INTO devices (device_id, hostname, ip)
-VALUES ('sensor-01', 'sensor-server', '192.168.1.10')
-ON CONFLICT (device_id) DO NOTHING;
+-- Note: Devices are registered dynamically when sensors first connect.
+-- The `ensure_device()` function in db.py handles device registration.

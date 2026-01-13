@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Database Layer
+Analytical-Intelligence v1 - Database Layer
 """
 
 from datetime import datetime
@@ -76,24 +76,23 @@ async def get_session() -> AsyncSession:
         yield session
 
 
-async def ensure_device(session: AsyncSession, device_id: str, hostname: str = None, ip: str = None) -> Device:
-    """Ensure a device exists in the database."""
-    result = await session.execute(
-        text("SELECT device_id FROM devices WHERE device_id = :device_id"),
-        {"device_id": device_id}
+async def ensure_device(
+    session: AsyncSession,
+    device_id: str,
+    hostname: str | None = None,
+    ip: str | None = None
+) -> None:
+    await session.execute(
+        text("""
+            INSERT INTO devices (device_id, hostname, ip)
+            VALUES (:device_id, :hostname, NULLIF(:ip, '')::inet)
+            ON CONFLICT (device_id) DO UPDATE
+            SET
+              hostname = COALESCE(EXCLUDED.hostname, devices.hostname),
+              ip = COALESCE(EXCLUDED.ip, devices.ip)
+        """),
+        {"device_id": device_id, "hostname": hostname, "ip": ip or ""}
     )
-    existing = result.fetchone()
-    
-    if not existing:
-        await session.execute(
-            text("""
-                INSERT INTO devices (device_id, hostname, ip) 
-                VALUES (:device_id, :hostname, :ip)
-                ON CONFLICT (device_id) DO UPDATE SET hostname = :hostname, ip = :ip
-            """),
-            {"device_id": device_id, "hostname": hostname, "ip": ip}
-        )
-        await session.commit()
 
 
 async def insert_raw_event(
@@ -105,21 +104,20 @@ async def insert_raw_event(
 ) -> int:
     """Insert a raw event and return its ID."""
     result = await session.execute(
-        text("""
-            INSERT INTO raw_events (ts, device_id, event_type, payload)
-            VALUES (:ts, :device_id, :event_type, :payload)
-            RETURNING id
-        """),
-        {
-            "ts": ts,
-            "device_id": device_id,
-            "event_type": event_type,
-            "payload": json.dumps(payload)
-        }
-    )
-    await session.commit()
-    row = result.fetchone()
-    return row[0] if row else None
+    text("""
+        INSERT INTO raw_events (ts, device_id, event_type, payload)
+        VALUES (:ts, :device_id, :event_type, :payload::jsonb)
+        RETURNING id
+    """),
+    {
+        "ts": ts,
+        "device_id": device_id,
+        "event_type": event_type,
+        "payload": json.dumps(payload)
+    }
+)
+row = result.fetchone()
+return row[0] if row else None
 
 
 async def insert_detection(
@@ -135,10 +133,10 @@ async def insert_detection(
 ) -> int:
     """Insert a detection and return its ID."""
     result = await session.execute(
-        text("""
-            INSERT INTO detections (ts, device_id, raw_event_id, model_name, label, score, severity, details)
-            VALUES (:ts, :device_id, :raw_event_id, :model_name, :label, :score, :severity, :details)
-            RETURNING id
+    text("""
+        INSERT INTO detections (ts, device_id, raw_event_id, model_name, label, score, severity, details)
+        VALUES (:ts, :device_id, :raw_event_id, :model_name, :label, :score, :severity, :details::jsonb)
+        RETURNING id
         """),
         {
             "ts": ts,
@@ -148,12 +146,11 @@ async def insert_detection(
             "label": label,
             "score": score,
             "severity": severity,
-            "details": json.dumps(details)
+            "details": json.dumps(details or {})
         }
     )
-    await session.commit()
     row = result.fetchone()
-    return row[0] if row else None
+return row[0] if row else None
 
 
 async def get_stats(session: AsyncSession) -> dict:

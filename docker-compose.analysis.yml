@@ -1,38 +1,70 @@
 version: "3.8"
 
+# =============================================================================
+# Analytical-Intelligence v1 - Analysis Server Stack
+# Runs on the analysis machine
+# =============================================================================
+#
+# The backend listens on 0.0.0.0:8000 so it's accessible from:
+#   - Sensor servers (for ingestion API)
+#   - Your Windows machine (for Dashboard UI)
+#
+# REQUIRED environment variables (set in .env):
+#   INGEST_API_KEY  - API key for authenticating sensor agents
+#
+# OPTIONAL environment variables:
+#   POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB - Database credentials
+#
+# =============================================================================
+
 services:
+  # ─────────────────────────────────────────────────────────────────────────
   # PostgreSQL Database
+  # ─────────────────────────────────────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
-    container_name: minisiem-postgres
+    container_name: ai_db-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-siem}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-siempass123}
-      POSTGRES_DB: ${POSTGRES_DB:-minisiem}
+      POSTGRES_USER: ${POSTGRES_USER:-ai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai2025}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-siem} -d ${POSTGRES_DB:-minisiem}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+    #  test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai} -d ${POSTGRES_DB:-ai_db}" ]
+   
+
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - siem-network
+      - ai-network
+    # PostgreSQL is NOT exposed externally - only backend can access it
 
-  # FastAPI Backend
+    # ─────────────────────────────────────────────────────────────────────────
+    # Backend API + UI (FastAPI)
+    # ─────────────────────────────────────────────────────────────────────────
   backend:
     build:
       context: ./services/backend
       dockerfile: Dockerfile
-    container_name: minisiem-backend
+    container_name: ai_db-backend
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-siem}:${POSTGRES_PASSWORD:-siempass123}@postgres:5432/${POSTGRES_DB:-minisiem}
-      INGEST_API_KEY: ${INGEST_API_KEY:-test-api-key-12345}
+      # Database connection (uses container name 'postgres')
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ai}:${POSTGRES_PASSWORD:-ai2025}@postgres:5432/${POSTGRES_DB:-ai_db}
+      # API key for ingestion endpoints
+      INGEST_API_KEY: ${INGEST_API_KEY:?error - set INGEST_API_KEY in .env}
+      # Backend host binds to all interfaces
+      BACKEND_HOST: "0.0.0.0"
+      BACKEND_PORT: "8000"
+      # Model paths (inside container)
       SSH_MODEL_PATH: /app/models/ssh/ssh_lstm.joblib
       NETWORK_MODEL_PATH: /app/models/network/model.joblib
       NETWORK_FEATURES_PATH: /app/models/network/feature_list.json
@@ -41,20 +73,21 @@ services:
     volumes:
       - ./models/ssh:/app/models/ssh:ro
       - ./models/network:/app/models/network:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+    ports:
+      # Expose to all interfaces so Windows can access via LAN IP
+      - "8000:8000"
     networks:
-      - siem-network
+      - ai-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  ai-network:
+    driver: bridge
 
 volumes:
   postgres_data:
-
-networks:
-  siem-network:
-    driver: bridge

@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Suricata Event Ingestion
+Analytical-Intelligence v1 - Suricata Event Ingestion
 """
 
 import logging
@@ -98,13 +98,17 @@ async def ingest_suricata_event(
             
             logger.info(f"Suricata detection: {signature[:50]} ({severity})")
         
+        await session.commit()
+
         return IngestResponse(
             status="accepted",
             event_id=event_id,
             detection_id=detection_id,
             message="Suricata event processed"
         )
-        
+
     except Exception as e:
+        await session.rollback()
         logger.error(f"Suricata ingestion error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+

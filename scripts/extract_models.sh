@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================
-# Mini-SIEM v1 - Model Extraction Script
+# Analytical-Intelligence v1 - Model Extraction Script
 # =====================================================
 # This script extracts models from zip files if they exist.
 # It is idempotent - running multiple times is safe.
@@ -14,7 +14,7 @@ SSH_MODEL_DIR="$PROJECT_ROOT/models/ssh"
 NETWORK_MODEL_DIR="$PROJECT_ROOT/models/network"
 
 echo "========================================"
-echo "Mini-SIEM v1 - Model Extraction"
+echo "Analytical-Intelligence v1 - Model Extraction"
 echo "========================================"
 
 # Create model directories if they don't exist

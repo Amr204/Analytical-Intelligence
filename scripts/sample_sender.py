@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Mini-SIEM v1 - Sample Event Sender
+Analytical-Intelligence v1 - Sample Event Sender
 Sends fake auth/suricata/flow events for testing.
 """
 
@@ -32,7 +32,7 @@ def send_auth_event(url: str, api_key: str, device_id: str):
     
     resp = requests.post(
         f"{url}/api/v1/ingest/auth",
-        headers={"X-API-Key": api_key, "Content-Type": "application/json"},
+        headers={"INGEST_API_KEY": api_key, "Content-Type": "application/json"},
         json=payload,
         timeout=10
     )
@@ -114,7 +114,7 @@ def send_suricata_event(url: str, api_key: str, device_id: str):
     
     resp = requests.post(
         f"{url}/api/v1/ingest/suricata",
-        headers={"X-API-Key": api_key, "Content-Type": "application/json"},
+        headers={"INGEST_API_KEY": api_key, "Content-Type": "application/json"},
         json=payload,
         timeout=10
     )
@@ -154,7 +154,7 @@ def send_flow_event(url: str, api_key: str, device_id: str):
     
     resp = requests.post(
         f"{url}/api/v1/ingest/flow",
-        headers={"X-API-Key": api_key, "Content-Type": "application/json"},
+        headers={"INGEST_API_KEY": api_key, "Content-Type": "application/json"},
         json=payload,
         timeout=10
     )
@@ -162,7 +162,7 @@ def send_flow_event(url: str, api_key: str, device_id: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Send sample events to Mini-SIEM")
+    parser = argparse.ArgumentParser(description="Send sample events to Analytical-Intelligence")
     parser.add_argument("--url", default="http://localhost:8000", help="Backend URL")
     parser.add_argument("--api-key", default="test-api-key-12345", help="API Key")
     parser.add_argument("--device-id", default="sensor-01", help="Device ID")

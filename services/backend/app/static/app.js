@@ -1,5 +1,5 @@
 /**
- * Mini-SIEM v1 - Frontend JavaScript
+ * Analytical-Intelligencel-Intelligence v1 - Frontend JavaScript
  * Handles polling and real-time updates
  */
 
@@ -38,15 +38,15 @@ async function fetchStats() {
     try {
         const response = await fetch(`${API_BASE}/api/v1/stats`);
         if (!response.ok) throw new Error('Failed to fetch stats');
-        
+
         const stats = await response.json();
-        
+
         // Update stat cards
         updateElement('total-events', stats.total_events);
         updateElement('total-detections', stats.total_detections);
         updateElement('detections-24h', stats.detections_24h);
         updateElement('total-devices', stats.total_devices);
-        
+
         updateLastUpdateTime();
     } catch (error) {
         console.error('Error fetching stats:', error);
@@ -60,17 +60,17 @@ async function fetchRecentDetections() {
     try {
         const response = await fetch(`${API_BASE}/api/v1/recent-detections?limit=10`);
         if (!response.ok) throw new Error('Failed to fetch detections');
-        
+
         const detections = await response.json();
-        
+
         const tbody = document.querySelector('#recent-alerts tbody');
         if (!tbody) return;
-        
+
         if (detections.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No recent alerts</td></tr>';
             return;
         }
-        
+
         tbody.innerHTML = detections.map(d => `
             <tr class="severity-row-${d.severity.toLowerCase()}">
                 <td class="timestamp">${d.ts ? d.ts.substring(0, 19) : '--'}</td>
@@ -81,7 +81,7 @@ async function fetchRecentDetections() {
                 <td>${d.score.toFixed(2)}</td>
             </tr>
         `).join('');
-        
+
     } catch (error) {
         console.error('Error fetching detections:', error);
     }
@@ -114,7 +114,7 @@ function startPolling() {
     // Initial fetch
     fetchStats();
     fetchRecentDetections();
-    
+
     // Set up interval
     pollTimer = setInterval(() => {
         fetchStats();
@@ -138,11 +138,11 @@ function stopPolling() {
 function init() {
     // Only poll on dashboard page
     const isDashboard = window.location.pathname === '/' || window.location.pathname === '';
-    
+
     if (isDashboard) {
         startPolling();
     }
-    
+
     // Handle visibility change to pause/resume polling
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
@@ -151,7 +151,7 @@ function init() {
             startPolling();
         }
     });
-    
+
     // Update time on any page
     updateLastUpdateTime();
 }

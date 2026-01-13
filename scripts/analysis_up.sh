@@ -1,83 +1,102 @@
 #!/bin/bash
-# =====================================================
-# Mini-SIEM v1 - Analysis Server Startup Script
-# =====================================================
+# =============================================================================
+# Analytical-Intelligence v1 - Analysis Stack Startup Script
+# =============================================================================
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "========================================"
-echo "Mini-SIEM v1 - Analysis Server"
-echo "========================================"
+cd "$PROJECT_DIR"
+
+echo "=============================================="
+echo "Analytical-Intelligence Analysis Stack Startup"
+echo "=============================================="
 
 # Check Docker
-echo "[1/4] Checking Docker..."
 if ! command -v docker &> /dev/null; then
-    echo "ERROR: Docker is not installed. Please install Docker first."
+    echo "ERROR: Docker is not installed!"
+    echo "Install with: curl -fsSL https://get.docker.com | sudo sh"
     exit 1
 fi
 
-if ! docker info &> /dev/null; then
-    echo "ERROR: Docker daemon is not running. Please start Docker first."
-    exit 1
-fi
-echo "[✓] Docker is running"
-
-# Check Docker Compose
-echo "[2/4] Checking Docker Compose..."
 if ! docker compose version &> /dev/null; then
-    echo "ERROR: Docker Compose v2 is required. Please install it."
+    echo "ERROR: Docker Compose is not available!"
     exit 1
 fi
-echo "[✓] Docker Compose is available"
 
-# Extract models if needed
-echo "[3/4] Checking models..."
-if [ -f "$SCRIPT_DIR/extract_models.sh" ]; then
-    bash "$SCRIPT_DIR/extract_models.sh"
+# Check if .env exists (optional for analysis server)
+if [ -f ".env" ]; then
+    echo "Loading .env..."
+    set -a
+    source .env
+    set +a
 fi
+
+# Check models
+echo ""
+echo "Checking ML models..."
+
+SSH_MODEL="models/ssh/ssh_lstm.joblib"
+if [ -f "$SSH_MODEL" ]; then
+    echo "  ✓ SSH LSTM model found"
+else
+    echo "  ⚠ SSH LSTM model not found at $SSH_MODEL"
+    echo "    Copy from: models/Host-Model/ssh_lstm.joblib"
+fi
+
+NETWORK_MODEL="models/network/model.joblib"
+if [ -f "$NETWORK_MODEL" ]; then
+    echo "  ✓ Network ML model found"
+else
+    echo "  ⚠ Network ML model not found at $NETWORK_MODEL"
+    echo "    Copy from: models/Network-Model/"
+fi
+
+# Print configuration
+echo ""
+echo "Configuration:"
+echo "  INGEST_API_KEY: ${INGEST_API_KEY:+[set]}${INGEST_API_KEY:-[using default]}"
+echo "  POSTGRES_USER:  ${POSTGRES_USER:-ai}"
+echo "  POSTGRES_DB:    ${POSTGRES_DB:-ai_db}"
+echo ""
 
 # Start the stack
-echo "[4/4] Starting Analysis stack..."
-cd "$PROJECT_ROOT"
+echo "Starting Analysis Stack..."
 docker compose -f docker-compose.analysis.yml up -d --build
 
-echo ""
-echo "========================================"
-echo "Waiting for services to be ready..."
-echo "========================================"
-
 # Wait for backend to be healthy
+echo ""
+echo "Waiting for backend to be ready..."
 MAX_WAIT=60
-COUNTER=0
-while [ $COUNTER -lt $MAX_WAIT ]; do
+WAIT=0
+while [ $WAIT -lt $MAX_WAIT ]; do
     if curl -s http://localhost:8000/api/v1/health > /dev/null 2>&1; then
-        echo "[✓] Backend is healthy!"
-        break
+        echo ""
+        echo "=============================================="
+        echo "Analysis Stack Ready!"
+        echo "=============================================="
+        echo ""
+        echo "Dashboard: http://localhost:8000"
+        echo ""
+        echo "From other machines, use your LAN IP:"
+        # Try to detect LAN IP
+        LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
+        if [ -n "$LAN_IP" ]; then
+            echo "  http://${LAN_IP}:8000"
+        fi
+        echo ""
+        echo "Monitor logs with:"
+        echo "  docker compose -f docker-compose.analysis.yml logs -f backend"
+        echo ""
+        exit 0
     fi
-    echo "Waiting for backend... ($COUNTER/$MAX_WAIT)"
     sleep 2
-    COUNTER=$((COUNTER + 2))
+    WAIT=$((WAIT + 2))
+    echo -n "."
 done
 
-if [ $COUNTER -ge $MAX_WAIT ]; then
-    echo "[!] Warning: Backend did not become healthy in time."
-    echo "    Check logs with: docker compose -f docker-compose.analysis.yml logs backend"
-fi
-
 echo ""
-echo "========================================"
-echo "Mini-SIEM Analysis Server Started!"
-echo "========================================"
-echo ""
-echo "Dashboard:  http://localhost:8000"
-echo "Health:     http://localhost:8000/api/v1/health"
-echo ""
-echo "View logs:"
-echo "  docker compose -f docker-compose.analysis.yml logs -f backend"
-echo ""
-echo "Stop:"
-echo "  docker compose -f docker-compose.analysis.yml down"
-echo ""
+echo "WARNING: Backend health check timed out."
+echo "Check logs: docker compose -f docker-compose.analysis.yml logs backend"

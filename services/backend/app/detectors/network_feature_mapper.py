@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Network Feature Mapper
+Analytical-Intelligence v1 - Network Feature Mapper
 Maps NFStream flow data to CIC-IDS2017 feature format.
 """
 

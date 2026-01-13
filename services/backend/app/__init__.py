@@ -1,3 +1,3 @@
 """
-Mini-SIEM v1 - Backend Application Package
+Analytical-Intelligence v1 - Backend Application Package
 """

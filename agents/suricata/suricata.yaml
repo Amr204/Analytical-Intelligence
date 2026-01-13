@@ -1,6 +1,6 @@
 %YAML 1.1
 ---
-# Mini-SIEM v1 - Suricata Configuration
+# Analytical-Intelligence v1 - Suricata Configuration
 # Minimal config optimized for real-time alerting
 
 vars:

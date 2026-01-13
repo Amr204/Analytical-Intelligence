@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 """
-Mini-SIEM v1 - Auth Log Collector Agent
+Analytical-Intelligence v1 - Auth Log Collector Agent
 Tails /var/log/auth.log and sends each line to the analysis server in real-time.
 """
 
-import os
 import sys
+import os
 import time
 import logging
 from datetime import datetime
 import requests
 
-# Configuration from environment
-ANALYZER_URL = os.environ.get("ANALYZER_URL", "http://192.168.1.20:8000")
-API_KEY = os.environ.get("X_API_KEY", "test-api-key-12345")
-DEVICE_ID = os.environ.get("DEVICE_ID", "sensor-01")
-HOSTNAME = os.environ.get("HOSTNAME", "sensor-server")
-DEVICE_IP = os.environ.get("DEVICE_IP", "192.168.1.10")
-AUTH_LOG_PATH = os.environ.get("AUTH_LOG_PATH", "/var/log/auth.log")
+# Add parent directory for common imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from common.ip_utils import load_agent_config, print_config_banner
 
 # Logging
 logging.basicConfig(
@@ -26,22 +23,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Configuration (loaded at startup)
+CONFIG = None
+AUTH_LOG_PATH = os.environ.get("AUTH_LOG_PATH", "/var/log/auth.log")
+
 
 def send_auth_event(line: str) -> bool:
     """Send an auth.log line to the analysis server."""
     try:
         payload = {
-            "device_id": DEVICE_ID,
-            "hostname": HOSTNAME,
-            "device_ip": DEVICE_IP,
+            "device_id": CONFIG["device_id"],
+            "hostname": CONFIG["hostname"],
+            "device_ip": CONFIG["device_ip"],
             "line": line.strip(),
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
         
         response = requests.post(
-            f"{ANALYZER_URL}/api/v1/ingest/auth",
+            f"{CONFIG['analyzer_url']}/api/v1/ingest/auth",
             headers={
-                "X-API-Key": API_KEY,
+                "INGEST_API_KEY": CONFIG["ingest_api_key"],
                 "Content-Type": "application/json"
             },
             json=payload,
@@ -104,26 +105,39 @@ def tail_file(filepath: str):
             time.sleep(5)
 
 
-def main():
-    logger.info("=" * 50)
-    logger.info("Mini-SIEM Auth Collector Agent")
-    logger.info("=" * 50)
-    logger.info(f"Analyzer URL: {ANALYZER_URL}")
-    logger.info(f"Device ID: {DEVICE_ID}")
-    logger.info(f"Auth log: {AUTH_LOG_PATH}")
-    logger.info("=" * 50)
-    
-    # Check connectivity
+def check_analyzer_connection() -> bool:
+    """Check connectivity to analysis server."""
     logger.info("Checking connectivity to analysis server...")
     try:
-        resp = requests.get(f"{ANALYZER_URL}/api/v1/health", timeout=10)
+        resp = requests.get(f"{CONFIG['analyzer_url']}/api/v1/health", timeout=10)
         if resp.status_code == 200:
             logger.info("✓ Connected to analysis server")
+            return True
         else:
             logger.warning(f"Server returned status {resp.status_code}")
+            return False
     except Exception as e:
         logger.warning(f"Could not connect to analysis server: {e}")
         logger.warning("Will continue anyway and retry...")
+        return False
+
+
+def main():
+    global CONFIG
+    
+    # Load configuration
+    try:
+        CONFIG = load_agent_config()
+    except (ValueError, RuntimeError) as e:
+        logger.error(f"Configuration error: {e}")
+        sys.exit(1)
+    
+    # Print banner
+    print_config_banner(CONFIG, "Auth Collector Agent")
+    logger.info(f"Auth log path: {AUTH_LOG_PATH}")
+    
+    # Check connectivity
+    check_analyzer_connection()
     
     # Start tailing
     sent_count = 0

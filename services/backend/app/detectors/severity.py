@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Severity Classification
+Analytical-Intelligence v1 - Severity Classification
 """
 
 from typing import Optional

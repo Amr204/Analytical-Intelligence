@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - UI Package
+Analytical-Intelligence v1 - UI Package
 """
 
 from app.ui.routes import router

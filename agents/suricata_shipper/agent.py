@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 """
-Mini-SIEM v1 - Suricata Shipper Agent
+Analytical-Intelligence v1 - Suricata Shipper Agent
 Tails eve.json and sends alert events to the analysis server in real-time.
 """
 
-import os
 import sys
+import os
 import json
 import time
 import logging
 from datetime import datetime
 import requests
 
-# Configuration from environment
-ANALYZER_URL = os.environ.get("ANALYZER_URL", "http://192.168.1.20:8000")
-API_KEY = os.environ.get("X_API_KEY", "test-api-key-12345")
-DEVICE_ID = os.environ.get("DEVICE_ID", "sensor-01")
-HOSTNAME = os.environ.get("HOSTNAME", "sensor-server")
-DEVICE_IP = os.environ.get("DEVICE_IP", "192.168.1.10")
-EVE_JSON_PATH = os.environ.get("EVE_JSON_PATH", "/var/log/suricata/eve.json")
+# Add parent directory for common imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from common.ip_utils import load_agent_config, print_config_banner
 
 # Logging
 logging.basicConfig(
@@ -27,22 +24,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Configuration (loaded at startup)
+CONFIG = None
+EVE_JSON_PATH = os.environ.get("EVE_JSON_PATH", "/var/log/suricata/eve.json")
+
 
 def send_suricata_event(event: dict) -> bool:
     """Send a Suricata event to the analysis server."""
     try:
         payload = {
-            "device_id": DEVICE_ID,
-            "hostname": HOSTNAME,
-            "device_ip": DEVICE_IP,
+            "device_id": CONFIG["device_id"],
+            "hostname": CONFIG["hostname"],
+            "device_ip": CONFIG["device_ip"],
             "event": event,
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
         
         response = requests.post(
-            f"{ANALYZER_URL}/api/v1/ingest/suricata",
+            f"{CONFIG['analyzer_url']}/api/v1/ingest/suricata",
             headers={
-                "X-API-Key": API_KEY,
+                "INGEST_API_KEY": CONFIG["ingest_api_key"],
                 "Content-Type": "application/json"
             },
             json=payload,
@@ -109,26 +110,39 @@ def tail_file(filepath: str):
             time.sleep(5)
 
 
-def main():
-    logger.info("=" * 50)
-    logger.info("Mini-SIEM Suricata Shipper Agent")
-    logger.info("=" * 50)
-    logger.info(f"Analyzer URL: {ANALYZER_URL}")
-    logger.info(f"Device ID: {DEVICE_ID}")
-    logger.info(f"EVE JSON: {EVE_JSON_PATH}")
-    logger.info("=" * 50)
-    
-    # Check connectivity
+def check_analyzer_connection() -> bool:
+    """Check connectivity to analysis server."""
     logger.info("Checking connectivity to analysis server...")
     try:
-        resp = requests.get(f"{ANALYZER_URL}/api/v1/health", timeout=10)
+        resp = requests.get(f"{CONFIG['analyzer_url']}/api/v1/health", timeout=10)
         if resp.status_code == 200:
             logger.info("✓ Connected to analysis server")
+            return True
         else:
             logger.warning(f"Server returned status {resp.status_code}")
+            return False
     except Exception as e:
         logger.warning(f"Could not connect to analysis server: {e}")
         logger.warning("Will continue anyway and retry...")
+        return False
+
+
+def main():
+    global CONFIG
+    
+    # Load configuration
+    try:
+        CONFIG = load_agent_config()
+    except (ValueError, RuntimeError) as e:
+        logger.error(f"Configuration error: {e}")
+        sys.exit(1)
+    
+    # Print banner
+    print_config_banner(CONFIG, "Suricata Shipper Agent")
+    logger.info(f"EVE JSON path: {EVE_JSON_PATH}")
+    
+    # Check connectivity
+    check_analyzer_connection()
     
     # Start tailing
     alert_count = 0

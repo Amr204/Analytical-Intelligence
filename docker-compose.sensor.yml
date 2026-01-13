@@ -1,30 +1,57 @@
 version: "3.8"
 
+# =============================================================================
+# Analytical-Intelligence v1 - Sensor Server Stack
+# Runs on the sensor machine 
+# =============================================================================
+#
+# REQUIRED environment variables (set in .env):
+#   ANALYZER_HOST   - IP or hostname of Analysis server 
+#   INGEST_API_KEY  - API key matching Analysis server's INGEST_API_KEY
+#   DEVICE_ID       - Unique identifier for this sensor (e.g., sensor-01)
+#   HOSTNAME        - Human-readable hostname
+#
+# OPTIONAL environment variables:
+#   NET_IFACE       - Network interface for capture (default: ens33)
+#   DEVICE_IP       - Override auto-detected device IP
+#   ANALYZER_PORT   - Analysis server port (default: 8000)
+#
+# =============================================================================
+
 services:
-  # Auth Log Collector - tails /var/log/auth.log
+  # ─────────────────────────────────────────────────────────────────────────
+  # Auth Log Collector - Monitors /var/log/auth.log for SSH events
+  # ─────────────────────────────────────────────────────────────────────────
   auth_collector:
     build:
       context: ./agents/auth_collector
       dockerfile: Dockerfile
-    container_name: minisiem-auth-collector
+    container_name: ai_db-auth-collector
     restart: unless-stopped
+    network_mode: host
     environment:
-      ANALYZER_URL: ${ANALYZER_URL:-http://192.168.1.20:8000}
-      X_API_KEY: ${X_API_KEY:-test-api-key-12345}
-      DEVICE_ID: ${DEVICE_ID:-sensor-01}
-      HOSTNAME: ${HOSTNAME:-sensor-server}
-      DEVICE_IP: ${DEVICE_IP:-192.168.1.10}
+      # Required - will error if not set
+      ANALYZER_HOST: ${ANALYZER_HOST:?error - set ANALYZER_HOST in .env}
+      INGEST_API_KEY: ${INGEST_API_KEY:?error - set INGEST_API_KEY in .env}
+      DEVICE_ID: ${DEVICE_ID:?error - set DEVICE_ID in .env}
+      HOSTNAME: ${HOSTNAME:?error - set HOSTNAME in .env}
+      # Optional with defaults
+      NET_IFACE: ${NET_IFACE:-ens33}
+      ANALYZER_PORT: ${ANALYZER_PORT:-8000}
+      # Optional override (leave empty for auto-detect)
+      DEVICE_IP: ${DEVICE_IP:-}
     volumes:
       - /var/log/auth.log:/var/log/auth.log:ro
-    networks:
-      - sensor-network
+      - ./agents/common:/app/common:ro
 
-  # Suricata IDS - Real-time packet capture
+  # ─────────────────────────────────────────────────────────────────────────
+  # Suricata IDS - Network Intrusion Detection
+  # ─────────────────────────────────────────────────────────────────────────
   suricata:
     build:
       context: ./agents/suricata
       dockerfile: Dockerfile
-    container_name: minisiem-suricata
+    container_name: ai_db-suricata
     restart: unless-stopped
     network_mode: host
     cap_add:
@@ -37,35 +64,43 @@ services:
       NET_IFACE: ${NET_IFACE:-ens33}
     volumes:
       - ./data/suricata:/var/log/suricata
-      - ./agents/suricata/suricata.yaml:/etc/suricata/suricata.yaml:ro
 
-  # Suricata Shipper - tails eve.json and ships to backend
+  # ─────────────────────────────────────────────────────────────────────────
+  # Suricata Shipper - Sends eve.json alerts to Analysis server
+  # ─────────────────────────────────────────────────────────────────────────
   suricata_shipper:
     build:
       context: ./agents/suricata_shipper
       dockerfile: Dockerfile
-    container_name: minisiem-suricata-shipper
+    container_name: ai_db-suricata-shipper
     restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - suricata
     environment:
-      ANALYZER_URL: ${ANALYZER_URL:-http://192.168.1.20:8000}
-      X_API_KEY: ${X_API_KEY:-test-api-key-12345}
-      DEVICE_ID: ${DEVICE_ID:-sensor-01}
-      HOSTNAME: ${HOSTNAME:-sensor-server}
-      DEVICE_IP: ${DEVICE_IP:-192.168.1.10}
+      # Required - will error if not set
+      ANALYZER_HOST: ${ANALYZER_HOST:?error - set ANALYZER_HOST in .env}
+      INGEST_API_KEY: ${INGEST_API_KEY:?error - set INGEST_API_KEY in .env}
+      DEVICE_ID: ${DEVICE_ID:?error - set DEVICE_ID in .env}
+      HOSTNAME: ${HOSTNAME:?error - set HOSTNAME in .env}
+      # Optional with defaults
+      NET_IFACE: ${NET_IFACE:-ens33}
+      ANALYZER_PORT: ${ANALYZER_PORT:-8000}
+      # Optional override (leave empty for auto-detect)
+      DEVICE_IP: ${DEVICE_IP:-}
       EVE_JSON_PATH: /var/log/suricata/eve.json
     volumes:
       - ./data/suricata:/var/log/suricata:ro
-    depends_on:
-      - suricata
-    networks:
-      - sensor-network
+      - ./agents/common:/app/common:ro
 
-  # Flow Collector - NFStream packet capture
+  # ─────────────────────────────────────────────────────────────────────────
+  # Flow Collector - Captures network flows with NFStream
+  # ─────────────────────────────────────────────────────────────────────────
   flow_collector:
     build:
       context: ./agents/flow_collector
       dockerfile: Dockerfile
-    container_name: minisiem-flow-collector
+    container_name: ai_db-flow-collector
     restart: unless-stopped
     network_mode: host
     cap_add:
@@ -74,15 +109,17 @@ services:
     security_opt:
       - apparmor=unconfined
     environment:
-      ANALYZER_URL: ${ANALYZER_URL:-http://192.168.1.20:8000}
-      X_API_KEY: ${X_API_KEY:-test-api-key-12345}
-      DEVICE_ID: ${DEVICE_ID:-sensor-01}
-      HOSTNAME: ${HOSTNAME:-sensor-server}
-      DEVICE_IP: ${DEVICE_IP:-192.168.1.10}
+      # Required - will error if not set
+      ANALYZER_HOST: ${ANALYZER_HOST:?error - set ANALYZER_HOST in .env}
+      INGEST_API_KEY: ${INGEST_API_KEY:?error - set INGEST_API_KEY in .env}
+      DEVICE_ID: ${DEVICE_ID:?error - set DEVICE_ID in .env}
+      HOSTNAME: ${HOSTNAME:?error - set HOSTNAME in .env}
+      # Optional with defaults
       NET_IFACE: ${NET_IFACE:-ens33}
+      ANALYZER_PORT: ${ANALYZER_PORT:-8000}
+      # Optional override (leave empty for auto-detect)
+      DEVICE_IP: ${DEVICE_IP:-}
       FLOW_IDLE_TIMEOUT: ${FLOW_IDLE_TIMEOUT:-2}
       FLOW_ACTIVE_TIMEOUT: ${FLOW_ACTIVE_TIMEOUT:-5}
-
-networks:
-  sensor-network:
-    driver: bridge
+    volumes:
+      - ./agents/common:/app/common:ro

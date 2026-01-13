@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """
-Mini-SIEM v1 - Flow Collector Agent
+Analytical-Intelligence v1 - Flow Collector Agent
 Captures network flows using NFStream and sends them to the analysis server.
 """
 
-import os
 import sys
+import os
 import logging
 from datetime import datetime
 import requests
+
+# Add parent directory for common imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from common.ip_utils import load_agent_config, print_config_banner
 
 # Try to import nfstream
 try:
@@ -18,16 +23,6 @@ except ImportError:
     print("Install with: pip install nfstream")
     sys.exit(1)
 
-# Configuration from environment
-ANALYZER_URL = os.environ.get("ANALYZER_URL", "http://192.168.1.20:8000")
-API_KEY = os.environ.get("X_API_KEY", "test-api-key-12345")
-DEVICE_ID = os.environ.get("DEVICE_ID", "sensor-01")
-HOSTNAME = os.environ.get("HOSTNAME", "sensor-server")
-DEVICE_IP = os.environ.get("DEVICE_IP", "192.168.1.10")
-NET_IFACE = os.environ.get("NET_IFACE", "ens33")
-IDLE_TIMEOUT = int(os.environ.get("FLOW_IDLE_TIMEOUT", "2"))
-ACTIVE_TIMEOUT = int(os.environ.get("FLOW_ACTIVE_TIMEOUT", "5"))
-
 # Logging
 logging.basicConfig(
     level=logging.INFO,
@@ -35,22 +30,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Configuration (loaded at startup)
+CONFIG = None
+IDLE_TIMEOUT = int(os.environ.get("FLOW_IDLE_TIMEOUT", "2"))
+ACTIVE_TIMEOUT = int(os.environ.get("FLOW_ACTIVE_TIMEOUT", "5"))
+
 
 def send_flow_event(flow: dict) -> bool:
     """Send a flow event to the analysis server."""
     try:
         payload = {
-            "device_id": DEVICE_ID,
-            "hostname": HOSTNAME,
-            "device_ip": DEVICE_IP,
+            "device_id": CONFIG["device_id"],
+            "hostname": CONFIG["hostname"],
+            "device_ip": CONFIG["device_ip"],
             "flow": flow,
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
         
         response = requests.post(
-            f"{ANALYZER_URL}/api/v1/ingest/flow",
+            f"{CONFIG['analyzer_url']}/api/v1/ingest/flow",
             headers={
-                "X-API-Key": API_KEY,
+                "INGEST_API_KEY": CONFIG["ingest_api_key"],
                 "Content-Type": "application/json"
             },
             json=payload,
@@ -114,35 +114,48 @@ def flow_to_dict(flow) -> dict:
     }
 
 
-def main():
-    logger.info("=" * 50)
-    logger.info("Mini-SIEM Flow Collector Agent")
-    logger.info("=" * 50)
-    logger.info(f"Analyzer URL: {ANALYZER_URL}")
-    logger.info(f"Device ID: {DEVICE_ID}")
-    logger.info(f"Interface: {NET_IFACE}")
-    logger.info(f"Idle timeout: {IDLE_TIMEOUT}s")
-    logger.info(f"Active timeout: {ACTIVE_TIMEOUT}s")
-    logger.info("=" * 50)
-    
-    # Check connectivity
+def check_analyzer_connection() -> bool:
+    """Check connectivity to analysis server."""
     logger.info("Checking connectivity to analysis server...")
     try:
-        resp = requests.get(f"{ANALYZER_URL}/api/v1/health", timeout=10)
+        resp = requests.get(f"{CONFIG['analyzer_url']}/api/v1/health", timeout=10)
         if resp.status_code == 200:
             logger.info("✓ Connected to analysis server")
+            return True
         else:
             logger.warning(f"Server returned status {resp.status_code}")
+            return False
     except Exception as e:
         logger.warning(f"Could not connect to analysis server: {e}")
         logger.warning("Will continue anyway and retry...")
+        return False
+
+
+def main():
+    global CONFIG
+    
+    # Load configuration
+    try:
+        CONFIG = load_agent_config()
+    except (ValueError, RuntimeError) as e:
+        logger.error(f"Configuration error: {e}")
+        sys.exit(1)
+    
+    # Print banner
+    print_config_banner(CONFIG, "Flow Collector Agent")
+    logger.info(f"Idle timeout: {IDLE_TIMEOUT}s")
+    logger.info(f"Active timeout: {ACTIVE_TIMEOUT}s")
+    
+    # Check connectivity
+    check_analyzer_connection()
     
     # Create NFStreamer
-    logger.info(f"Starting NFStream on {NET_IFACE}...")
+    net_iface = CONFIG["net_iface"]
+    logger.info(f"Starting NFStream on {net_iface}...")
     
     try:
         streamer = NFStreamer(
-            source=NET_IFACE,
+            source=net_iface,
             idle_timeout=IDLE_TIMEOUT,
             active_timeout=ACTIVE_TIMEOUT,
             accounting_mode=1,  # IP/Port based

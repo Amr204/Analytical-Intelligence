@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Pydantic Schemas
+Analytical-Intelligence v1 - Pydantic Schemas
 """
 
 from datetime import datetime

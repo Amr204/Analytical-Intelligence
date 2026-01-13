@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Network ML Detector
+Analytical-Intelligence v1 - Network ML Detector
 Classifies network flows using the trained ML model.
 """
 
@@ -42,11 +42,22 @@ def analyze_flow(flow_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         
         # Predict
         label, score, proba = network_ml_model.predict(features)
-        
+
+        label_norm = (label or "").strip().upper()
+
+        # Reject benign/unknown/empty
+        if label_norm in ("BENIGN", "UNKNOWN", ""):
+            return None
+
+        # Reject labels not in known label map (when model loaded)
+        known = set(network_ml_model.label_map.keys()) if network_ml_model.loaded else set()
+        if known and label not in known:
+            return None
+
         logger.debug(f"Flow prediction: {label} (score={score:.3f})")
-        
+
         # Only create detection for non-benign with sufficient confidence
-        if label != "BENIGN" and score >= settings.network_ml_threshold:
+        if label_norm != "BENIGN" and score >= settings.network_ml_threshold:
             severity = get_network_ml_severity(label, score)
             
             # Build detection details

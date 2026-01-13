@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Ingestion Package
+Analytical-Intelligence v1 - Ingestion Package
 """
 
 from app.ingest.auth_ingest import router as auth_router

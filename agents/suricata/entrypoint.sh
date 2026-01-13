@@ -1,12 +1,12 @@
 #!/bin/bash
-# Mini-SIEM v1 - Suricata Entrypoint
+# Analytical-Intelligence v1 - Suricata Entrypoint
 
 set -e
 
 NET_IFACE="${NET_IFACE:-ens33}"
 
 echo "=========================================="
-echo "Mini-SIEM Suricata IDS"
+echo "Analytical-Intelligence Suricata IDS"
 echo "=========================================="
 echo "Interface: ${NET_IFACE}"
 echo "=========================================="

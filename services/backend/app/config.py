@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Configuration
+Analytical-Intelligence v1 - Configuration
 """
 
 import os
@@ -11,10 +11,10 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     # Database
-    database_url: str = "postgresql+asyncpg://siem:siempass123@postgres:5432/minisiem"
+    database_url: str = "postgresql+asyncpg://ai:ai2025@postgres:5432/ai_db"
     
     # Security
-    ingest_api_key: str = "test-api-key-12345"
+    ingest_api_key: str = "ONuMcisin3paJYkPDaf0tt9n2deEBeaN"
     
     # Server
     backend_host: str = "0.0.0.0"

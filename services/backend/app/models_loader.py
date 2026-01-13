@@ -1,5 +1,5 @@
 """
-Mini-SIEM v1 - Model Loaders
+Analytical-Intelligence v1 - Model Loaders
 Gracefully loads ML models with fallback behavior.
 """
 

@@ -101,23 +101,23 @@ async def insert_raw_event(
     device_id: str,
     event_type: str,
     payload: dict
-) -> int:
+) -> Optional[int]:
     """Insert a raw event and return its ID."""
     result = await session.execute(
-    text("""
-        INSERT INTO raw_events (ts, device_id, event_type, payload)
-        VALUES (:ts, :device_id, :event_type, :payload::jsonb)
-        RETURNING id
-    """),
-    {
-        "ts": ts,
-        "device_id": device_id,
-        "event_type": event_type,
-        "payload": json.dumps(payload)
-    }
-)
-row = result.fetchone()
-return row[0] if row else None
+        text("""
+            INSERT INTO raw_events (ts, device_id, event_type, payload)
+            VALUES (:ts, :device_id, :event_type, :payload::jsonb)
+            RETURNING id
+        """),
+        {
+            "ts": ts,
+            "device_id": device_id,
+            "event_type": event_type,
+            "payload": json.dumps(payload)
+        }
+    )
+    row = result.fetchone()
+    return int(row[0]) if row else None
 
 
 async def insert_detection(
@@ -130,13 +130,13 @@ async def insert_detection(
     score: float,
     severity: str,
     details: dict
-) -> int:
+) -> Optional[int]:
     """Insert a detection and return its ID."""
     result = await session.execute(
-    text("""
-        INSERT INTO detections (ts, device_id, raw_event_id, model_name, label, score, severity, details)
-        VALUES (:ts, :device_id, :raw_event_id, :model_name, :label, :score, :severity, :details::jsonb)
-        RETURNING id
+        text("""
+            INSERT INTO detections (ts, device_id, raw_event_id, model_name, label, score, severity, details)
+            VALUES (:ts, :device_id, :raw_event_id, :model_name, :label, :score, :severity, :details::jsonb)
+            RETURNING id
         """),
         {
             "ts": ts,
@@ -150,7 +150,7 @@ async def insert_detection(
         }
     )
     row = result.fetchone()
-return row[0] if row else None
+    return int(row[0]) if row else None
 
 
 async def get_stats(session: AsyncSession) -> dict:

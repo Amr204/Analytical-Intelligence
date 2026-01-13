@@ -40,34 +40,40 @@ class SSHLSTMModel:
             
             if not os.path.exists(model_path):
                 logger.warning(f"SSH LSTM model not found at {model_path}")
+                self.model = None
+                self.loaded = False
                 return False
-            
+        
             bundle = joblib.load(model_path)
-            
+        
             # Extract components
             model_json = bundle.get("model_json")
             weights = bundle.get("weights")
-            
-            if model_json and weights:
-                self.model = model_from_json(model_json)
-                self.model.set_weights(weights)
-            
+        
+            if not model_json or not weights:
+                raise ValueError("Invalid SSH LSTM model bundle")
+        
+            self.model = model_from_json(model_json)
+            self.model.set_weights(weights)
+        
             self.token2id = bundle.get("token2id", {})
             self.window_size = bundle.get("window_size", 10)
             self.stride = bundle.get("stride", 1)
             self.fail_threshold = bundle.get("fail_threshold", 5)
             self.time_window_sec = bundle.get("time_window_sec", 300)
             self.threshold = bundle.get("threshold", 0.5)
-            
+        
             self.loaded = True
             logger.info(f"SSH LSTM model loaded successfully from {model_path}")
             logger.info(f"  - Tokens: {len(self.token2id)}")
             logger.info(f"  - Window size: {self.window_size}")
             logger.info(f"  - Threshold: {self.threshold}")
             return True
-            
+        
         except Exception as e:
             logger.error(f"Failed to load SSH LSTM model: {e}")
+            self.model = None
+            self.loaded = False
             return False
     
     def predict(self, token_sequence: np.ndarray) -> Tuple[float, bool]:

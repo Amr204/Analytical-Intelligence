@@ -252,9 +252,9 @@ cd Analytical-Intelligence
 # 3. صلاحيات سكربتات التشغيل
 chmod +x scripts/*.sh
 
-# 4. إنشاء ملف .env (اختياري - لتغيير API Key)
+# 4. إنشاء ملف .env (يجب تغيير API Key إذا كنت تستخدمه):
 cp .env.example .env
-nano .env  # تعديل INGEST_API_KEY
+nano .env  # تعديل INGEST_API_KEY (أو ستستخدم الافتراضي للاختبار)
 
 # 5. تشغيل النظام (أفضل خيار: سكربت جاهز)
 bash scripts/analysis_up.sh
@@ -295,24 +295,18 @@ ip link show
 # مثال: ens33, eth0, enp0s3
 
 # 5. إنشاء ملف .env
-# ⚡ الجديد: DEVICE_IP يتم اكتشافه تلقائياً من NET_IFACE!
-cat > .env << 'EOF'
-# عنوان خادم التحليل (IP فقط بدون http://)
-ANALYZER_HOST=<ANALYZER_IP>
+cp .env.example .env
+nano .env
 
-# مفتاح API (يجب أن يتطابق مع Analysis server)
-INGEST_API_KEY=ONuMcisin3paJYkPDaf0tt9n2deEBeaN
-
-# واجهة الشبكة للالتقاط
-NET_IFACE=ens33
-
-# معرف الجهاز
-DEVICE_ID=sensor-01
-HOSTNAME=sensor-server
-
-# DEVICE_IP يتم اكتشافه تلقائياً! (لا حاجة لتعيينه)
-# DEVICE_IP=    # فقط إذا فشل الاكتشاف التلقائي
-EOF
+# عدّل المتغيرات التالية:
+#   ANALYZER_HOST=<IP خادم التحليل>
+#   INGEST_API_KEY=<نفس مفتاح Analysis>
+#   NET_IFACE=<واجهة الشبكة مثل ens33>
+#   DEVICE_ID=sensor-01
+#   HOSTNAME=sensor-server
+#
+# ⚡ DEVICE_IP يُكتشف تلقائياً من NET_IFACE
+#   (عيّنه فقط إذا فشل الاكتشاف التلقائي)
 
 # 6. التحقق من الاتصال بخادم التحليل
 ping -c 3 <ANALYZER_IP>
@@ -651,22 +645,21 @@ ip link show
 #### الخطوة 2.6: إنشاء ملف البيئة
 
 ```bash
-# استبدل القيم حسب بيئتك
-cat > .env << 'EOF'
-ANALYZER_HOST=<ANALYZER_IP>
-ANALYZER_PORT=8000
-INGEST_API_KEY=ONuMcisin3paJYkPDaf0tt9n2deEBeaN
-DEVICE_ID=sensor-01
-HOSTNAME=sensor-server
-NET_IFACE=ens33
-EOF
-
-# التحقق
-cat .env
+cp .env.example .env
+nano .env
 ```
 
+**المتغيرات المطلوب تعديلها:**
+| المتغير | القيمة |
+|---------|-------|
+| `ANALYZER_HOST` | IP خادم التحليل |
+| `INGEST_API_KEY` | نفس مفتاح Analysis |
+| `NET_IFACE` | واجهة الشبكة (ens33, eth0...) |
+| `DEVICE_ID` | sensor-01 |
+| `HOSTNAME` | sensor-server |
+
 > [!TIP]
-> **الجديد:** لا حاجة لتعيين `DEVICE_IP` - يتم اكتشافه تلقائياً من واجهة الشبكة!
+> `DEVICE_IP` يُكتشف تلقائياً من `NET_IFACE` - عيّنه فقط إذا فشل الاكتشاف التلقائي.
 
 #### الخطوة 2.7: إعداد مجلد Suricata
 

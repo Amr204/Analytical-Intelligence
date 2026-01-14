@@ -2,7 +2,7 @@
 Analytical-Intelligence v1 - Common Agent Utilities
 """
 
-from agents.common.ip_utils import (
+from .ip_utils import (
     get_ip_from_iface,
     get_ip_via_route,
     detect_device_ip,

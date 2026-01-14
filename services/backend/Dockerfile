@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libpq-dev \
     gcc \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory

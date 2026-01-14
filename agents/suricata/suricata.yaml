@@ -147,7 +147,8 @@ app-layer:
     ssh:
       enabled: yes
     ftp:
-      enabled: no
+      enabled: yes
+      detection-enabled: yes
     rdp:
       enabled: yes
     dhcp:

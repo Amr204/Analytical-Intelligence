@@ -34,10 +34,12 @@ Updating the system?  → UPGRADES.md
 | [UPGRADES.md](UPGRADES.md) | How to update the system safely | Operators |
 | [ML.md](ML.md) | ML models, thresholds, allowlist policy | Developers |
 | [SECURITY.md](SECURITY.md) | Firewall modes, API keys, hardening | Security admins |
+| [GIT_WORKFLOW.md](GIT_WORKFLOW.md) | Git best practices & standard workflow | Developers |
 
 ---
 
 ## Document Purposes
+
 
 ### [INSTALLATION.md](INSTALLATION.md)
 Step-by-step setup for:
@@ -83,6 +85,13 @@ Comprehensive runbook covering:
 - API key management
 - Exposure matrix
 - Production hardening
+
+### [GIT_WORKFLOW.md](GIT_WORKFLOW.md)
+- Branching strategy (`main` / `develop`)
+- Commit message standards
+- Handling large model files (`.joblib`)
+- Safe deployment practices
+
 
 ---
 

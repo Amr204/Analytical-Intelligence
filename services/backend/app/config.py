@@ -5,6 +5,7 @@ Analytical-Intelligence v1 - Configuration
 from __future__ import annotations
 
 from pathlib import Path
+from typing import List, Set
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,11 +25,18 @@ def _detect_project_root(start: Path) -> Path:
 
 PROJECT_ROOT = _detect_project_root(Path(__file__).resolve())
 
+# SSH model path
 DEFAULT_SSH_MODEL_PATH = str(PROJECT_ROOT / "models/ssh/ssh_lstm.joblib")
-DEFAULT_NETWORK_MODEL_PATH = str(PROJECT_ROOT / "models/network/model.joblib")
-DEFAULT_NETWORK_FEATURES_PATH = str(PROJECT_ROOT / "models/network/feature_list.json")
-DEFAULT_NETWORK_LABELS_PATH = str(PROJECT_ROOT / "models/network/label_map.json")
-DEFAULT_NETWORK_PREPROCESS_PATH = str(PROJECT_ROOT / "models/network/preprocess_config.json")
+
+# RF Network model paths 
+DEFAULT_NETWORK_MODEL_PATH = str(PROJECT_ROOT / "models/RF/random_forest.joblib")
+DEFAULT_NETWORK_FEATURES_PATH = str(PROJECT_ROOT / "models/RF/feature_list.json")
+DEFAULT_NETWORK_LABELS_PATH = str(PROJECT_ROOT / "models/RF/label_map.json")
+DEFAULT_NETWORK_PREPROCESS_PATH = str(PROJECT_ROOT / "models/RF/preprocess_config.json")
+DEFAULT_NETWORK_METRICS_PATH = str(PROJECT_ROOT / "models/RF/metrics.json")
+
+# Default allowlist: only these attack labels will create detections
+DEFAULT_NETWORK_LABEL_ALLOWLIST = "DoS,DDoS,Port Scanning,Brute Force"
 
 
 class Settings(BaseSettings):
@@ -53,9 +61,37 @@ class Settings(BaseSettings):
     network_features_path: str = DEFAULT_NETWORK_FEATURES_PATH
     network_labels_path: str = DEFAULT_NETWORK_LABELS_PATH
     network_preprocess_path: str = DEFAULT_NETWORK_PREPROCESS_PATH
+    network_metrics_path: str = DEFAULT_NETWORK_METRICS_PATH
 
     # Detection thresholds
     network_ml_threshold: float = 0.60
+
+    # SSH Detection
+    ssh_bruteforce_window_seconds: int = 300
+    ssh_bruteforce_threshold: int = 5
+    ssh_spray_username_threshold: int = 10 
+
+    # Network ML
+    ml_dedup_window_seconds: int = 300
+    ml_min_flow_rate_pps: int = 100
+    ml_min_bytes_per_second: int = 1000
+    ml_cooldown_seconds_per_src: int = 3600
+
+    # Network Label Allowlist (comma-separated)
+    # Only these labels will create detection records
+    # Default: DoS, DDoS, Port Scanning, Brute Force
+    network_label_allowlist: str = DEFAULT_NETWORK_LABEL_ALLOWLIST
+    
+    # What to do with non-allowed labels: "ignore" (skip) or "map_to_normal" (log only)
+    # Recommended: "ignore" - don't store any record for Web Attacks, Bots, etc.
+    network_non_allow_action: str = "ignore"
+
+    @property
+    def network_label_allowlist_set(self) -> Set[str]:
+        """Parse allowlist string into a set of normalized labels."""
+        if not self.network_label_allowlist:
+            return set()
+        return {label.strip() for label in self.network_label_allowlist.split(",") if label.strip()}
 
 
 # Global settings instance

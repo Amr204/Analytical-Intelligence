@@ -4,7 +4,7 @@
 <div class="page-content">
     <div class="page-header">
         <h1>🚨 Security Alerts</h1>
-        <p class="subtitle">All detections from Suricata IDS, SSH LSTM, and Network ML models</p>
+        <p class="subtitle">All detections from SSH LSTM and Network RF models</p>
     </div>
 
     <!-- Filters -->
@@ -24,18 +24,34 @@
                 <label for="model_name">Model</label>
                 <select name="model_name" id="model_name">
                     <option value="">All</option>
-                    <option value="suricata" {% if filters.model_name=='suricata' %}selected{% endif %}>Suricata
-                    </option>
                     <option value="ssh_lstm" {% if filters.model_name=='ssh_lstm' %}selected{% endif %}>SSH LSTM
                     </option>
-                    <option value="network_ml" {% if filters.model_name=='network_ml' %}selected{% endif %}>Network ML
+                    <option value="network_rf" {% if filters.model_name=='network_rf' %}selected{% endif %}>Network RF
                     </option>
                 </select>
             </div>
             <div class="filter-group">
-                <label for="label">Label Contains</label>
-                <input type="text" name="label" id="label" value="{{ filters.label or '' }}"
-                    placeholder="e.g., SSH, DoS">
+                <label for="label">Attack Type</label>
+                <select name="label" id="label">
+                    <option value="">All</option>
+                    <option value="DoS" {% if filters.label=='DoS' %}selected{% endif %}>DoS</option>
+                    <option value="DDoS" {% if filters.label=='DDoS' %}selected{% endif %}>DDoS</option>
+                    <option value="Port Scanning" {% if filters.label=='Port Scanning' %}selected{% endif %}>Port
+                        Scanning</option>
+                    <option value="Brute Force" {% if filters.label=='Brute Force' %}selected{% endif %}>Brute Force
+                    </option>
+                    <option value="SSH" {% if filters.label=='SSH' %}selected{% endif %}>SSH (LSTM)</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="device_id">Device</label>
+                <select name="device_id" id="device_id">
+                    <option value="">All Devices</option>
+                    {% for dev_id in device_ids %}
+                    <option value="{{ dev_id }}" {% if filters.device_id==dev_id %}selected{% endif %}>{{ dev_id }}
+                    </option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="filter-group">
                 <label for="last_minutes">Time Range</label>
@@ -55,6 +71,9 @@
     <!-- Results Count -->
     <div class="results-info">
         <span>Showing {{ detections|length }} alerts</span>
+        {% if filters.device_id %}
+        <span class="filter-tag">Device: {{ filters.device_id }}</span>
+        {% endif %}
     </div>
 
     <!-- Alerts Table -->
@@ -81,7 +100,7 @@
                     <td><span class="model-badge {{ d.model_name }}">{{ d.model_name }}</span></td>
                     <td class="label-cell" title="{{ d.label }}">{{ d.label[:60] }}{% if d.label|length > 60 %}...{%
                         endif %}</td>
-                    <td>{{ d.device_id }}</td>
+                    <td><a href="/devices/{{ d.device_id }}">{{ d.device_id }}</a></td>
                     <td>{{ "%.2f"|format(d.score) }}</td>
                     <td>
                         <button class="btn btn-sm btn-info" data-details="{{ d.details|tojson|e }}"

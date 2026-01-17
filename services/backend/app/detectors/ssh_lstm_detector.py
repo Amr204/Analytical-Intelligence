@@ -1,5 +1,5 @@
 """
-Analytical-Intelligencel-Intelligence v1 - SSH LSTM Detector
+Analytical-Intelligence v1 - SSH LSTM Detector
 Detects SSH brute force and anomalous authentication patterns.
 """
 
@@ -13,6 +13,7 @@ import numpy as np
 
 from app.models_loader import ssh_lstm_model
 from app.detectors.severity import get_ssh_severity
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ TOKEN_PATTERNS = [
     (r"POSSIBLE BREAK-IN ATTEMPT", "REVERSE_DNS_FAIL"),
     (r"Reverse mapping checking", "REVERSE_DNS_FAIL"),
     (r"pam_unix.*authentication failure", "PAM_AUTH_FAILURE"),
+    (r"authentication failure", "AUTH_FAILURE"), # Generic fallback
     (r"session opened for user", "SESSION_OPENED"),
     (r"session closed for user", "SESSION_CLOSED"),
 ]
@@ -130,14 +132,18 @@ def analyze_auth_event(line: str, timestamp: datetime = None) -> Optional[Dict[s
     Returns:
         Detection dict if anomaly detected, None otherwise
     """
+    logger.debug(f"SSH analyze_auth_event called with line: {line[:100]}...")
+    
     if timestamp is None:
         timestamp = datetime.utcnow()
     
     # Parse the line
     token_name, src_ip = parse_auth_line(line)
+    logger.debug(f"SSH parsed: token={token_name}, src_ip={src_ip}")
     
     if src_ip is None:
         # Can't track without IP
+        logger.debug("SSH detection skipped: no source IP found")
         return None
     
     # Get token ID
@@ -150,7 +156,7 @@ def analyze_auth_event(line: str, timestamp: datetime = None) -> Optional[Dict[s
     ssh_tracker.add_event(src_ip, token_id, timestamp)
     
     # Track failed attempts
-    if token_name in ["FAILED_PASSWORD", "INVALID_USER", "PAM_AUTH_FAILURE"]:
+    if token_name in ["FAILED_PASSWORD", "INVALID_USER", "PAM_AUTH_FAILURE", "AUTH_FAILURE"]:
         ssh_tracker.add_failed_attempt(src_ip, timestamp)
     
     # Check for anomalies
@@ -158,29 +164,45 @@ def analyze_auth_event(line: str, timestamp: datetime = None) -> Optional[Dict[s
     anomaly_score = 0.0
     failed_count = 0
     
+    logger.debug(f"SSH model status: loaded={ssh_lstm_model.loaded}, model_exists={ssh_lstm_model.model is not None}")
+    
     # 1. Model-based detection
     if ssh_lstm_model.loaded and ssh_lstm_model.model is not None:
         token_seq = ssh_tracker.get_token_sequence(src_ip, ssh_lstm_model.window_size)
+        logger.debug(f"SSH token_seq length={len(token_seq)} for IP {src_ip}")
         if len(token_seq) >= 3:  # Need some history
             anomaly_score, is_model_anomaly = ssh_lstm_model.predict(token_seq)
+            logger.debug(f"SSH model prediction: score={anomaly_score:.4f}, is_anomaly={is_model_anomaly}")
             if is_model_anomaly:
                 is_anomaly = True
+        else:
+            is_model_anomaly = False
+            logger.debug(f"SSH model skipped: insufficient token history ({len(token_seq)} < 3)")
     else:
         is_model_anomaly = False
+        logger.debug("SSH model not loaded, using threshold-only detection")
     
     # 2. Threshold-based detection (failed attempts)
+    # Use config setting for window
+    window_sec = settings.ssh_bruteforce_window_seconds
+    
     failed_count = ssh_tracker.get_failed_count_in_window(
         src_ip, 
         timestamp, 
-        ssh_lstm_model.time_window_sec if ssh_lstm_model.loaded else 300
+        window_sec
     )
     
-    fail_threshold = ssh_lstm_model.fail_threshold if ssh_lstm_model.loaded else 5
+    fail_threshold = settings.ssh_bruteforce_threshold
+    logger.debug(f"SSH threshold check: failed_count={failed_count}, threshold={fail_threshold}")
+    
     if failed_count >= fail_threshold:
         is_anomaly = True
     
     if not is_anomaly:
+        logger.debug(f"SSH detection skipped for {src_ip}: no anomaly detected")
         return None
+    
+    logger.info(f"SSH detection TRIGGERED for {src_ip}: failed_count={failed_count}, model_score={anomaly_score:.4f}")
     
     # Determine severity
     severity = get_ssh_severity(failed_count, is_model_anomaly, anomaly_score)
@@ -195,6 +217,7 @@ def analyze_auth_event(line: str, timestamp: datetime = None) -> Optional[Dict[s
         "model_threshold": ssh_lstm_model.threshold if ssh_lstm_model.loaded else None,
         "model_triggered": is_model_anomaly,
         "raw_line": line[:500],  # Truncate long lines
+        "signature_id": None, # Traceability
     }
     
     # Determine label
@@ -221,6 +244,6 @@ def get_model_info() -> Dict[str, Any]:
         "tokens": list(ssh_lstm_model.token2id.keys()) if ssh_lstm_model.loaded else [],
         "window_size": ssh_lstm_model.window_size,
         "threshold": ssh_lstm_model.threshold,
-        "fail_threshold": ssh_lstm_model.fail_threshold,
-        "time_window_sec": ssh_lstm_model.time_window_sec,
+        "fail_threshold": settings.ssh_bruteforce_threshold,
+        "time_window_sec": settings.ssh_bruteforce_window_seconds,
     }

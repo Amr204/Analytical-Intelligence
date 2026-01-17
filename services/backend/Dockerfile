@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 FROM python:3.11-slim
 
 # Set environment variables
@@ -19,15 +20,16 @@ WORKDIR /app
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies with BuildKit cache
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install -r requirements.txt
 
 # Copy application code
 COPY app/ ./app/
 
-# Create models directory (will be mounted)
-RUN mkdir -p /app/models/ssh /app/models/network
+# Create models directories (will be mounted)
+RUN mkdir -p /app/models/ssh /app/models/RF
 
 # Expose port
 EXPOSE 8000

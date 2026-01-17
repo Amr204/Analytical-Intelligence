@@ -21,39 +21,6 @@ class AuthEventPayload(BaseModel):
 
 
 # =====================================================
-# Suricata Event Schemas
-# =====================================================
-
-class SuricataAlert(BaseModel):
-    """Suricata alert structure."""
-    signature_id: Optional[int] = None
-    signature: str
-    category: Optional[str] = None
-    severity: Optional[int] = None
-    action: Optional[str] = None
-
-
-class SuricataEvent(BaseModel):
-    """Suricata eve.json event structure."""
-    event_type: str
-    alert: Optional[SuricataAlert] = None
-    src_ip: Optional[str] = None
-    src_port: Optional[int] = None
-    dest_ip: Optional[str] = None
-    dest_port: Optional[int] = None
-    proto: Optional[str] = None
-
-
-class SuricataEventPayload(BaseModel):
-    """Payload for Suricata event ingestion."""
-    device_id: str
-    hostname: str
-    device_ip: str
-    event: Dict[str, Any]
-    timestamp: Optional[str] = None
-
-
-# =====================================================
 # Flow Event Schemas
 # =====================================================
 

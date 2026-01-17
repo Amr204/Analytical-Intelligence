@@ -2,7 +2,7 @@
 Analytical-Intelligence v1 - Severity Classification
 """
 
-from typing import Optional
+from typing import Optional, Tuple
 
 
 # Severity levels
@@ -10,84 +10,50 @@ CRITICAL = "CRITICAL"
 HIGH = "HIGH"
 MEDIUM = "MEDIUM"
 LOW = "LOW"
-
-
-def get_suricata_severity(signature: str, category: str = None, suricata_severity: int = None) -> str:
-    """
-    Determine severity for Suricata alerts.
-    
-    Args:
-        signature: Alert signature text
-        category: Alert category
-        suricata_severity: Suricata's own severity (1=highest, 4=lowest)
-    
-    Returns:
-        Severity string: CRITICAL, HIGH, MEDIUM, or LOW
-    """
-    sig_lower = signature.lower() if signature else ""
-    cat_lower = category.lower() if category else ""
-    
-    # CRITICAL: DoS, DDoS, flood attacks
-    critical_patterns = [
-        "ddos", "dos ", "flood", "amplification",
-        "denial of service", "resource exhaustion"
-    ]
-    for pattern in critical_patterns:
-        if pattern in sig_lower or pattern in cat_lower:
-            return CRITICAL
-    
-    # HIGH: Scans, brute force, exploitation attempts
-    high_patterns = [
-        "scan", "brute", "exploit", "attack",
-        "shellcode", "trojan", "malware", "backdoor",
-        "command injection", "sql injection", "xss",
-        "remote code execution", "rce", "buffer overflow"
-    ]
-    for pattern in high_patterns:
-        if pattern in sig_lower or pattern in cat_lower:
-            return HIGH
-    
-    # Use Suricata's own severity as fallback
-    if suricata_severity is not None:
-        if suricata_severity == 1:
-            return HIGH
-        elif suricata_severity == 2:
-            return MEDIUM
-        else:
-            return LOW
-    
-    # Default
-    return MEDIUM
+INFO = "INFO"
 
 
 def get_network_ml_severity(label: str, score: float) -> str:
     """
-    Determine severity for network ML detections.
+    Determine severity for network ML (RF) detections.
     
     Args:
-        label: Predicted attack label
+        label: Predicted attack label from RF model
         score: Confidence score (0-1)
     
     Returns:
         Severity string
+    
+    RF Model Labels:
+        - Normal Traffic (benign - should not reach here)
+        - Port Scanning
+        - Brute Force
+        - DoS
+        - DDoS
+        - Bots
+        - Web Attacks
     """
     label_lower = label.lower() if label else ""
     
-    # CRITICAL: DDoS attacks
+    # CRITICAL: DDoS attacks - distributed denial of service
     if "ddos" in label_lower:
         return CRITICAL
     
-    # HIGH: DoS attacks
+    # HIGH/CRITICAL: DoS attacks based on confidence
     if "dos" in label_lower:
         if score >= 0.90:
             return CRITICAL
         return HIGH
     
     # HIGH: Brute force attacks
-    if "patator" in label_lower or "brute" in label_lower:
+    if "brute" in label_lower:
         return HIGH
     
-    # MEDIUM: Port scans
+    # HIGH: Web attacks (SQL injection, XSS, etc.)
+    if "web" in label_lower:
+        return HIGH
+    
+    # MEDIUM: Port scanning
     if "scan" in label_lower or "portscan" in label_lower:
         return MEDIUM
     

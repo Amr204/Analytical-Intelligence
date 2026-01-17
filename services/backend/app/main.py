@@ -3,6 +3,7 @@ Analytical-Intelligence v1 - Main Application
 FastAPI backend with Jinja2 templates
 """
 
+import os
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -15,11 +16,11 @@ from app.config import settings
 from app.models_loader import load_all_models
 from app.schemas import HealthResponse
 from app.ui import router as ui_router
-from app.ingest import auth_router, suricata_router, flow_router
+from app.ingest import auth_router, flow_router
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=os.getenv("LOG_LEVEL", "INFO"),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
@@ -38,12 +39,12 @@ async def lifespan(app: FastAPI):
     
     logger.info("-" * 50)
     logger.info("Model Status:")
-    logger.info(f"  SSH LSTM:    {'LOADED' if ssh_loaded else 'NOT LOADED'}")
-    logger.info(f"  Network ML:  {'LOADED' if network_loaded else 'NOT LOADED'}")
+    logger.info(f"  SSH LSTM:     {'LOADED' if ssh_loaded else 'NOT LOADED'}")
+    logger.info(f"  Network RF:   {'LOADED' if network_loaded else 'NOT LOADED'}")
     logger.info("-" * 50)
     
     if not ssh_loaded and not network_loaded:
-        logger.warning("No ML models loaded - only Suricata detection will work")
+        logger.warning("No ML models loaded - detection capabilities limited")
     
     logger.info(f"Backend running on {settings.backend_host}:{settings.backend_port}")
     logger.info("=" * 50)
@@ -68,7 +69,6 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 # Include routers
 app.include_router(ui_router)
 app.include_router(auth_router)
-app.include_router(suricata_router)
 app.include_router(flow_router)
 
 

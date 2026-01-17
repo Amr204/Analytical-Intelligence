@@ -49,12 +49,12 @@
             </div>
         </div>
 
-        <!-- Network ML Model -->
+        <!-- Network RF Model -->
         <div class="model-card {% if models.network_ml.loaded %}loaded{% else %}not-loaded{% endif %}">
             <div class="model-header">
                 <div class="model-icon">🌐</div>
                 <div class="model-title">
-                    <h2>Network ML</h2>
+                    <h2>Network RF</h2>
                     <span class="model-status {% if models.network_ml.loaded %}online{% else %}offline{% endif %}">
                         {{ 'LOADED' if models.network_ml.loaded else 'NOT LOADED' }}
                     </span>
@@ -63,7 +63,8 @@
             <div class="model-body">
                 <p class="model-description">
                     Random Forest classifier trained on CIC-IDS2017 dataset.
-                    Classifies network flows into attack categories using 70 flow features.
+                    Classifies network flows into attack categories using {{ models.network_ml.features_count }} flow
+                    features.
                 </p>
                 <div class="model-stats">
                     <div class="model-stat">
@@ -80,43 +81,13 @@
                     <h4>Attack Classes</h4>
                     <div class="label-tags">
                         {% for label in models.network_ml.labels %}
-                        <span class="label-tag {% if label == 'BENIGN' %}benign{% else %}attack{% endif %}">{{ label
+                        <span class="label-tag {% if label == 'Normal Traffic' %}benign{% else %}attack{% endif %}">{{
+                            label
                             }}</span>
                         {% endfor %}
                     </div>
                 </div>
                 {% endif %}
-            </div>
-        </div>
-
-        <!-- Suricata Info Card -->
-        <div class="model-card loaded">
-            <div class="model-header">
-                <div class="model-icon">🦈</div>
-                <div class="model-title">
-                    <h2>Suricata IDS</h2>
-                    <span class="model-status online">ACTIVE</span>
-                </div>
-            </div>
-            <div class="model-body">
-                <p class="model-description">
-                    Real-time signature-based network intrusion detection.
-                    Uses Emerging Threats ruleset updated automatically via suricata-update.
-                </p>
-                <div class="model-stats">
-                    <div class="model-stat">
-                        <span class="stat-label">Detection</span>
-                        <span class="stat-value">Real-time</span>
-                    </div>
-                    <div class="model-stat">
-                        <span class="stat-label">Latency</span>
-                        <span class="stat-value">~1 second</span>
-                    </div>
-                    <div class="model-stat">
-                        <span class="stat-label">Mode</span>
-                        <span class="stat-value">AF_PACKET</span>
-                    </div>
-                </div>
             </div>
         </div>
     </div>

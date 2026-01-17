@@ -56,8 +56,11 @@ async def ingest_auth_event(
             payload=event_payload
         )
         
+        logger.info(f"Auth event stored: event_id={event_id}, device={payload.device_id}")
+        
         # Run SSH LSTM detection
         detection_id = None
+        logger.debug(f"Running SSH detection on line: {payload.line[:80]}...")
         detection = analyze_auth_event(payload.line, ts)
         
         if detection:
@@ -72,7 +75,9 @@ async def ingest_auth_event(
                 severity=detection["severity"],
                 details=detection["details"]
             )
-            logger.info(f"SSH detection: {detection['label']} from {payload.device_id}")
+            logger.info(f"SSH detection INSERTED: id={detection_id}, label={detection['label']}, score={detection['score']:.4f}, device={payload.device_id}")
+        else:
+            logger.debug(f"SSH detection returned None for event_id={event_id}")
         
         await session.commit()
 

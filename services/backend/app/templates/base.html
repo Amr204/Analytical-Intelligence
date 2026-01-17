@@ -5,8 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#000000">
-    <meta name="description"
-        content="Analytical-Intelligencel-IntelAnalytical-Intelligence1 - Real-time Security Intelligence Dashboard">
+    <meta name="description" content="Analytical-Intelligence v1 - Real-time Security Intelligence Dashboard">
     <title>{% block title %}{{ page_title }} - Analytical-Intelligence{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,17 +19,19 @@
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <span class="logo">🛡️</sAnalytical-Intelligence <span class="brand-text">Analytical-Intelligence v1</span>
+            <span class="logo">🛡️</span><span class="brand-text">Analytical-Intelligence v1</span>
         </div>
         <ul class="nav-links">
             <li><a href="/" class="{% if page_title == 'Dashboard' %}active{% endif %}">Dashboard</a></li>
             <li><a href="/alerts" class="{% if page_title == 'Alerts' %}active{% endif %}">Alerts</a></li>
+            <li><a href="/devices"
+                    class="{% if page_title == 'Devices' or 'Device:' in page_title %}active{% endif %}">Devices</a>
+            </li>
             <li class="dropdown">
                 <a href="#" class="dropdown-toggle {% if 'Events' in page_title %}active{% endif %}">Events ▾</a>
                 <ul class="dropdown-menu">
                     <li><a href="/events/auth">Auth Events</a></li>
                     <li><a href="/events/flows">Flow Events</a></li>
-                    <li><a href="/events/suricata">Suricata Events</a></li>
                 </ul>
             </li>
             <li><a href="/models" class="{% if page_title == 'Models' %}active{% endif %}">Models</a></li>

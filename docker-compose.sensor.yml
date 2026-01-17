@@ -1,5 +1,4 @@
 
-
 # =============================================================================
 # Analytical-Intelligence v1 - Sensor Server Stack
 # Runs on the sensor machine 
@@ -42,55 +41,6 @@ services:
       DEVICE_IP: ${DEVICE_IP:-}
     volumes:
       - /var/log/auth.log:/var/log/auth.log:ro
-      - ./agents/common:/app/common:ro
-
-  # ─────────────────────────────────────────────────────────────────────────
-  # Suricata IDS - Network Intrusion Detection
-  # ─────────────────────────────────────────────────────────────────────────
-  suricata:
-    build:
-      context: ./agents/suricata
-      dockerfile: Dockerfile
-    container_name: ai_db-suricata
-    restart: unless-stopped
-    network_mode: host
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-      - SYS_NICE
-    security_opt:
-      - apparmor=unconfined
-    environment:
-      NET_IFACE: ${NET_IFACE:-ens33}
-    volumes:
-      - ./data/suricata:/var/log/suricata
-
-  # ─────────────────────────────────────────────────────────────────────────
-  # Suricata Shipper - Sends eve.json alerts to Analysis server
-  # ─────────────────────────────────────────────────────────────────────────
-  suricata_shipper:
-    build:
-      context: ./agents/suricata_shipper
-      dockerfile: Dockerfile
-    container_name: ai_db-suricata-shipper
-    restart: unless-stopped
-    network_mode: host
-    depends_on:
-      - suricata
-    environment:
-      # Required - will error if not set
-      ANALYZER_HOST: ${ANALYZER_HOST:?error - set ANALYZER_HOST in .env}
-      INGEST_API_KEY: ${INGEST_API_KEY:?error - set INGEST_API_KEY in .env}
-      DEVICE_ID: ${DEVICE_ID:?error - set DEVICE_ID in .env}
-      HOSTNAME: ${HOSTNAME:?error - set HOSTNAME in .env}
-      # Optional with defaults
-      NET_IFACE: ${NET_IFACE:-ens33}
-      ANALYZER_PORT: ${ANALYZER_PORT:-8000}
-      # Optional override (leave empty for auto-detect)
-      DEVICE_IP: ${DEVICE_IP:-}
-      EVE_JSON_PATH: /var/log/suricata/eve.json
-    volumes:
-      - ./data/suricata:/var/log/suricata:ro
       - ./agents/common:/app/common:ro
 
   # ─────────────────────────────────────────────────────────────────────────

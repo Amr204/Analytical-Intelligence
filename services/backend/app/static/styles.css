@@ -623,7 +623,7 @@ a:hover {
     letter-spacing: 0.5px;
 }
 
-.model-badge.suricata, .type-badge.suricata {
+.model-badge.network_rf, .type-badge.network {
     background: rgba(0, 212, 255, 0.15);
     color: var(--cyber-blue);
     border: 1px solid rgba(0, 212, 255, 0.3);
@@ -1323,3 +1323,146 @@ a:hover {
     0%, 50% { opacity: 1; }
     51%, 100% { opacity: 0; }
 }
+
+/* =====================================================
+   DEVICE PAGE STYLES
+   ===================================================== */
+
+/* Stats Mini Grid (for device detail page) */
+.stats-mini {
+    display: flex;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-lg);
+}
+
+.stat-mini {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--spacing-md);
+    background: var(--bg-hover);
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    min-width: 100px;
+}
+
+.stat-mini-value {
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--cyber-blue);
+}
+
+.stat-mini-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Label Stats List (top labels for device) */
+.label-stats {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.label-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-hover);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--neon-orange);
+}
+
+.label-name {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.label-count {
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: var(--neon-orange);
+}
+
+/* Filter Tags */
+.filter-tag {
+    display: inline-block;
+    padding: 4px 12px;
+    background: rgba(0, 212, 255, 0.15);
+    color: var(--cyber-blue);
+    border: 1px solid var(--cyber-blue);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    margin-left: var(--spacing-md);
+}
+
+/* Section Header with Actions */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.section-header h2 {
+    margin-bottom: 0;
+}
+
+/* Full Width Section Card */
+.section-card.full-width {
+    grid-column: 1 / -1;
+}
+
+/* Section Row - Two Column Layout */
+.section-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+/* Device link in alerts table */
+.data-table a {
+    color: var(--cyber-blue);
+    text-decoration: none;
+}
+
+.data-table a:hover {
+    color: var(--neon-green);
+    text-decoration: underline;
+}
+
+/* Info Card Variant */
+.stat-card.info-card {
+    border-left: 3px solid var(--cyber-blue);
+}
+
+/* Warning Card Variant */
+.stat-card.warning-card {
+    border-left: 3px solid var(--neon-red);
+}
+
+/* 404 Page */
+.error-page {
+    text-align: center;
+    padding: var(--spacing-2xl);
+}
+
+.error-page h1 {
+    font-family: var(--font-display);
+    font-size: 3rem;
+    color: var(--neon-red);
+}
+
+.error-page p {
+    color: var(--text-secondary);
+    margin-top: var(--spacing-md);
+}
+

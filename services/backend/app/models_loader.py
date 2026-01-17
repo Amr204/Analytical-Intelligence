@@ -108,11 +108,14 @@ class SSHLSTMModel:
 
 
 # =====================================================
-# Network ML Model Loader
+# Network RF Model Loader (Random Forest)
 # =====================================================
 
 class NetworkMLModel:
-    """Network ML model wrapper."""
+    """
+    Network ML model wrapper for Random Forest classifier.
+    Trained on CIC-IDS2017 dataset with 52 features.
+    """
     
     def __init__(self):
         self.model = None
@@ -121,7 +124,10 @@ class NetworkMLModel:
         self.inverse_label_map: Dict[int, str] = {}
         self.median_map: Dict[str, float] = {}
         self.columns_to_clip: list = []
+        self.metrics: Dict[str, Any] = {}
         self.loaded: bool = False
+        # Benign label for RF model
+        self.benign_label: str = "Normal Traffic"
     
     def load(
         self,
@@ -130,20 +136,32 @@ class NetworkMLModel:
         labels_path: str,
         preprocess_path: str
     ) -> bool:
-        """Load the network ML model and its artifacts."""
+        """Load the network RF model and its artifacts."""
         try:
             import joblib
             
-            # Check all files exist
-            for path in [model_path, features_path, labels_path, preprocess_path]:
-                if not os.path.exists(path):
-                    logger.warning(f"Network model file not found: {path}")
-                    return False
+            # Check required files exist
+            if not os.path.exists(model_path):
+                logger.warning(f"Network RF model not found: {model_path}")
+                return False
             
-            # Load model
+            if not os.path.exists(features_path):
+                logger.warning(f"Network RF features not found: {features_path}")
+                return False
+                
+            if not os.path.exists(labels_path):
+                logger.warning(f"Network RF labels not found: {labels_path}")
+                return False
+            
+            # Load model (sklearn RandomForest with predict_proba)
             self.model = joblib.load(model_path)
             
-            # Load feature list
+            # Verify model has predict_proba (required for confidence scores)
+            if not hasattr(self.model, 'predict_proba'):
+                logger.error("Loaded model does not have predict_proba method")
+                return False
+            
+            # Load feature list (52 features with spaces in names)
             with open(features_path, "r") as f:
                 self.feature_list = json.load(f)
             
@@ -152,26 +170,40 @@ class NetworkMLModel:
                 self.label_map = json.load(f)
                 self.inverse_label_map = {v: k for k, v in self.label_map.items()}
             
-            # Load preprocess config
-            with open(preprocess_path, "r") as f:
-                preprocess = json.load(f)
-                self.median_map = preprocess.get("median_map", {})
-                self.columns_to_clip = preprocess.get("columns_to_clip", [])
+            # Load preprocess config (optional - may not exist for RF)
+            if os.path.exists(preprocess_path):
+                with open(preprocess_path, "r") as f:
+                    preprocess = json.load(f)
+                    self.median_map = preprocess.get("median_map", {})
+                    self.columns_to_clip = preprocess.get("columns_to_clip", [])
+            else:
+                logger.info("No preprocess config found, using defaults")
+                self.median_map = {}
+                self.columns_to_clip = []
+            
+            # Load metrics (optional - for UI display)
+            metrics_path = settings.network_metrics_path
+            if os.path.exists(metrics_path):
+                with open(metrics_path, "r") as f:
+                    self.metrics = json.load(f)
             
             self.loaded = True
-            logger.info(f"Network ML model loaded successfully")
+            logger.info(f"Network RF model loaded successfully")
             logger.info(f"  - Features: {len(self.feature_list)}")
             logger.info(f"  - Labels: {list(self.label_map.keys())}")
+            logger.info(f"  - Benign label: {self.benign_label}")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to load Network ML model: {e}")
+            logger.error(f"Failed to load Network RF model: {e}")
             return False
     
     def predict(self, features: np.ndarray) -> Tuple[str, float, np.ndarray]:
         """
         Predict attack class for feature vector.
         Returns (label_name, confidence, all_probabilities).
+        
+        Uses sklearn-style predict_proba for Random Forest.
         """
         if not self.loaded or self.model is None:
             return "UNKNOWN", 0.0, np.array([])
@@ -181,17 +213,45 @@ class NetworkMLModel:
             if features.ndim == 1:
                 features = features.reshape(1, -1)
             
-            # Get probabilities
+            # Get prediction probabilities
             proba = self.model.predict_proba(features)[0]
-            label_id = int(np.argmax(proba))
-            score = float(proba[label_id])
+            
+            if proba is None or len(proba) == 0:
+                return "UNKNOWN", 0.0, np.array([])
+            
+            # Extract label and score
+            label_id, score = self._extract_label_and_score(proba)
             label_name = self.inverse_label_map.get(label_id, "UNKNOWN")
             
             return label_name, score, proba
             
         except Exception as e:
-            logger.error(f"Network ML prediction error: {e}")
+            logger.error(f"Network RF prediction error: {e}")
             return "UNKNOWN", 0.0, np.array([])
+    
+    def _extract_label_and_score(self, proba: np.ndarray, threshold: float = 0.5) -> Tuple[int, float]:
+        """
+        Extract label ID and confidence score from probability array.
+        
+        Args:
+            proba: Probability array (n-class for multiclass)
+            threshold: Threshold for binary classification (default 0.5)
+        
+        Returns:
+            (label_id, score)
+        """
+        num_classes = len(proba)
+        
+        if num_classes == 2:
+            # Binary classification
+            score = float(proba[1])  # Probability of class 1
+            label_id = 1 if score >= threshold else 0
+            return label_id, score if label_id == 1 else (1.0 - score)
+        else:
+            # Multiclass classification
+            label_id = int(np.argmax(proba))
+            score = float(proba[label_id])
+            return label_id, score
 
 
 # =====================================================
@@ -211,7 +271,7 @@ def load_all_models():
     if not ssh_loaded:
         logger.warning("SSH LSTM model not loaded - SSH detection will be limited")
     
-    # Load Network ML
+    # Load Network RF
     network_loaded = network_ml_model.load(
         settings.network_model_path,
         settings.network_features_path,
@@ -219,7 +279,7 @@ def load_all_models():
         settings.network_preprocess_path
     )
     if not network_loaded:
-        logger.warning("Network ML model not loaded - flow classification will be disabled")
+        logger.warning("Network RF model not loaded - flow classification will be disabled")
     
     return ssh_loaded, network_loaded
 
@@ -240,5 +300,7 @@ def get_models_status() -> Dict[str, Any]:
             "features_count": len(network_ml_model.feature_list) if network_ml_model.loaded else 0,
             "labels": list(network_ml_model.label_map.keys()) if network_ml_model.loaded else [],
             "labels_count": len(network_ml_model.label_map) if network_ml_model.loaded else 0,
+            "benign_label": network_ml_model.benign_label,
+            "metrics": network_ml_model.metrics if network_ml_model.loaded else {},
         }
     }

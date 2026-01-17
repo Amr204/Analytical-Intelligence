@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-content">
+    <!-- Header with back link -->
+    <div class="page-header">
+        <a href="/devices" class="btn btn-secondary btn-sm" style="margin-bottom: var(--spacing-md);">← Back to
+            Devices</a>
+        <h1>📡 {{ device.device_id }}</h1>
+        <p class="subtitle">Device details and recent alerts</p>
+    </div>
+
+    <!-- Device Info Card -->
+    <div class="section-row">
+        <div class="section-card">
+            <h2>Device Information</h2>
+            <div class="model-details">
+                <div class="detail-row">
+                    <span class="detail-label">Device ID</span>
+                    <span class="detail-value">{{ device.device_id }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Hostname</span>
+                    <span class="detail-value">{{ device.hostname or 'N/A' }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">IP Address</span>
+                    <span class="detail-value">{{ device.ip or 'N/A' }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Status</span>
+                    <span class="detail-value">
+                        {% if device.status == 'online' %}
+                        <span class="model-status status-loaded">● Online</span>
+                        {% else %}
+                        <span class="model-status status-not-loaded">● Offline</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Last Seen</span>
+                    <span class="detail-value timestamp">{{ device.last_seen[:19] if device.last_seen else 'Never'
+                        }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Registered</span>
+                    <span class="detail-value timestamp">{{ device.created_at[:19] if device.created_at else 'N/A'
+                        }}</span>
+                </div>
+                {% if device.os %}
+                <div class="detail-row">
+                    <span class="detail-label">OS</span>
+                    <span class="detail-value">{{ device.os }}</span>
+                </div>
+                {% endif %}
+                {% if device.role %}
+                <div class="detail-row">
+                    <span class="detail-label">Role</span>
+                    <span class="detail-value">{{ device.role }}</span>
+                </div>
+                {% endif %}
+                {% if device.tags %}
+                <div class="detail-row">
+                    <span class="detail-label">Tags</span>
+                    <span class="detail-value">{{ device.tags }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h2>Alert Statistics</h2>
+            <div class="stats-mini">
+                <div class="stat-mini">
+                    <span class="stat-mini-value">{{ alerts_total }}</span>
+                    <span class="stat-mini-label">Total Alerts</span>
+                </div>
+                <div class="stat-mini">
+                    <span class="stat-mini-value" style="color: var(--neon-orange);">{{ alerts_count_24h }}</span>
+                    <span class="stat-mini-label">Last 24h</span>
+                </div>
+                <div class="stat-mini">
+                    <span class="stat-mini-value" style="color: var(--neon-red);">{{ alerts_count_1h }}</span>
+                    <span class="stat-mini-label">Last 1h</span>
+                </div>
+            </div>
+
+            {% if label_stats %}
+            <h3 style="margin-top: var(--spacing-lg); font-size: 0.9rem; color: var(--cyber-blue);">Top Labels (24h)
+            </h3>
+            <div class="label-stats">
+                {% for stat in label_stats[:5] %}
+                <div class="label-stat-row">
+                    <span class="label-name">{{ stat.label }}</span>
+                    <span class="label-count">{{ stat.count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent Alerts Table -->
+    <div class="section-card full-width">
+        <div class="section-header">
+            <h2>Recent Alerts</h2>
+            <a href="/alerts?device_id={{ device.device_id }}" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+
+        <div class="alerts-table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Timestamp</th>
+                        <th>Severity</th>
+                        <th>Model</th>
+                        <th>Label</th>
+                        <th>Score</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in recent_alerts %}
+                    <tr class="severity-row-{{ alert.severity|lower }}">
+                        <td>{{ alert.id }}</td>
+                        <td class="timestamp">{{ alert.ts[:19] }}</td>
+                        <td><span class="severity-badge {{ alert.severity|lower }}">{{ alert.severity }}</span></td>
+                        <td><span class="model-badge {{ alert.model_name }}">{{ alert.model_name }}</span></td>
+                        <td class="label-cell">{{ alert.label }}</td>
+                        <td>{{ "%.2f"|format(alert.score) }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info" data-details="{{ alert.details|tojson|e }}"
+                                onclick="showDetails(this.dataset.details)">View</button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="empty-state">No alerts for this device</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Details Modal -->
+<div id="details-modal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <h3>Alert Details</h3>
+        <pre id="details-json"></pre>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function showDetails(detailsJson) {
+        const details = JSON.parse(detailsJson);
+        document.getElementById('details-json').textContent = JSON.stringify(details, null, 2);
+        document.getElementById('details-modal').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('details-modal').style.display = 'none';
+    }
+
+    window.onclick = function (event) {
+        const modal = document.getElementById('details-modal');
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}

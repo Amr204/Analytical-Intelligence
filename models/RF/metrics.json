@@ -1,0 +1,49 @@
+{
+  "macro_f1": 0.96,
+  "weighted_f1": 1.0,
+  "accuracy": 1.0,
+  "per_class_metrics": {
+    "Bots": {
+      "precision": 0.71,
+      "recall": 0.83,
+      "f1-score": 0.77,
+      "support": 584
+    },
+    "Brute Force": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 2745
+    },
+    "DDoS": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 38404
+    },
+    "DoS": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 58124
+    },
+    "Normal Traffic": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 628518
+    },
+    "Port Scanning": {
+      "precision": 0.99,
+      "recall": 1.0,
+      "f1-score": 0.99,
+      "support": 27208
+    },
+    "Web Attacks": {
+      "precision": 0.98,
+      "recall": 0.97,
+      "f1-score": 0.98,
+      "support": 643
+    }
+  }
+}

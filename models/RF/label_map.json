@@ -1,0 +1,9 @@
+{
+  "Normal Traffic": 0,
+  "Port Scanning": 1,
+  "Brute Force": 2,
+  "DoS": 3,
+  "DDoS": 4,
+  "Bots": 5,
+  "Web Attacks": 6
+}

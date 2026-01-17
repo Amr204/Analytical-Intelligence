@@ -1,0 +1,11 @@
+{
+  "fill_missing_value": 0.0,
+  "columns_to_clip": [
+    "Flow Duration",
+    "Flow Bytes/s",
+    "Flow Packets/s",
+    "Fwd Packets/s",
+    "Bwd Packets/s"
+  ],
+  "median_map": {}
+}

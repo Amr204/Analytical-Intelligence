@@ -14,6 +14,20 @@ echo "=============================================="
 echo "Analytical-Intelligence Analysis Stack Startup"
 echo "=============================================="
 
+# Enable BuildKit for faster builds with pip caching
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+echo "✓ BuildKit enabled (faster rebuilds with pip cache)"
+echo ""
+
+# Run Docker Doctor preflight checks
+if ! bash "$SCRIPT_DIR/docker_doctor.sh"; then
+    echo ""
+    echo "Fix the above issues and re-run."
+    exit 1
+fi
+echo ""
+
 # Check Docker
 if ! command -v docker &> /dev/null; then
     echo "ERROR: Docker is not installed!"
@@ -46,12 +60,12 @@ else
     echo "    Copy from: models/Host-Model/ssh_lstm.joblib"
 fi
 
-NETWORK_MODEL="models/network/model.joblib"
+NETWORK_MODEL="models/RF/random_forest.joblib"
 if [ -f "$NETWORK_MODEL" ]; then
-    echo "  ✓ Network ML model found"
+    echo "  ✓ Network RF model found"
 else
-    echo "  ⚠ Network ML model not found at $NETWORK_MODEL"
-    echo "    Copy from: models/Network-Model/"
+    echo "  ⚠ Network RF model not found at $NETWORK_MODEL"
+    echo "    The RF model should be in models/RF/"
 fi
 
 # Print configuration
@@ -79,6 +93,8 @@ while [ $WAIT -lt $MAX_WAIT ]; do
         echo "=============================================="
         echo ""
         echo "Dashboard: http://localhost:8000"
+        echo "Devices:   http://localhost:8000/devices"
+        echo "Alerts:    http://localhost:8000/alerts"
         echo ""
         echo "From other machines, use your LAN IP:"
         # Try to detect LAN IP

@@ -14,6 +14,20 @@ echo "=============================================="
 echo "Analytical-Intelligence Sensor Stack Startup"
 echo "=============================================="
 
+# Enable BuildKit for faster builds with pip caching
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+echo "✓ BuildKit enabled (faster rebuilds with pip cache)"
+echo ""
+
+# Run Docker Doctor preflight checks
+if ! bash "$SCRIPT_DIR/docker_doctor.sh"; then
+    echo ""
+    echo "Fix the above issues and re-run."
+    exit 1
+fi
+echo ""
+
 # Check if .env exists
 if [ ! -f ".env" ]; then
     echo "ERROR: .env file not found!"
@@ -24,8 +38,8 @@ if [ ! -f ".env" ]; then
     echo ""
     echo "Required variables:"
     echo "  ANALYZER_HOST=<analysis-server-ip>"
-    echo "  INGEST_API_KEY=ONuMcisin3paJYkPDaf0tt9n2deEBeaN"
-    echo "  DEVICE_ID=sensor-01"
+    echo "  INGEST_API_KEY=<same-key-as-analysis-server>"
+    echo "  DEVICE_ID=sensor-01   (must be unique per sensor!)"
     echo "  HOSTNAME=my-sensor"
     echo "  NET_IFACE=ens33"
     exit 1
@@ -54,10 +68,6 @@ if [ -n "$MISSING" ]; then
     exit 1
 fi
 
-# Create data directories
-echo "Creating data directories..."
-mkdir -p data/suricata
-
 # Check Docker
 if ! command -v docker &> /dev/null; then
     echo "ERROR: Docker is not installed!"
@@ -78,6 +88,13 @@ echo ""
 echo "=============================================="
 echo "Sensor Stack Started!"
 echo "=============================================="
+echo ""
+echo "Device ID: $DEVICE_ID"
+echo "Hostname:  $HOSTNAME"
+echo "Sending to: ${ANALYZER_HOST:-$ANALYZER_URL}"
+echo ""
+echo "This sensor will appear at:"
+echo "  http://<ANALYZER_IP>:8000/devices"
 echo ""
 echo "Monitor logs with:"
 echo "  docker compose -f docker-compose.sensor.yml logs -f"

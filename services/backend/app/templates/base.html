@@ -16,41 +16,164 @@
     {% block extra_head %}{% endblock %}
 </head>
 
-<body>
-    <nav class="navbar">
-        <div class="nav-brand">
-            <span class="logo">🛡️</span><span class="brand-text">Analytical-Intelligence v1</span>
+<body class="app-shell">
+    <!-- Left Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="logo">🛡️</span>
+            <span class="brand-text">AI v1</span>
+            <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
         </div>
-        <ul class="nav-links">
-            <li><a href="/" class="{% if page_title == 'Dashboard' %}active{% endif %}">Dashboard</a></li>
-            <li><a href="/alerts" class="{% if page_title == 'Alerts' %}active{% endif %}">Alerts</a></li>
-            <li><a href="/devices"
-                    class="{% if page_title == 'Devices' or 'Device:' in page_title %}active{% endif %}">Devices</a>
-            </li>
-            <li class="dropdown">
-                <a href="#" class="dropdown-toggle {% if 'Events' in page_title %}active{% endif %}">Events ▾</a>
-                <ul class="dropdown-menu">
-                    <li><a href="/events/auth">Auth Events</a></li>
-                    <li><a href="/events/flows">Flow Events</a></li>
-                </ul>
-            </li>
-            <li><a href="/models" class="{% if page_title == 'Models' %}active{% endif %}">Models</a></li>
-        </ul>
-        <div class="nav-status">
-            <span class="status-indicator online"></span>
-            <span id="last-update">Last update: --</span>
+
+        <nav class="sidebar-nav">
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="/" class="nav-link {% if page_title == 'Dashboard' %}active{% endif %}">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/alerts" class="nav-link {% if page_title == 'Alerts' %}active{% endif %}">
+                        <span class="nav-icon">🚨</span>
+                        <span class="nav-text">Alerts</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/devices"
+                        class="nav-link {% if page_title == 'Devices' or 'Device:' in page_title %}active{% endif %}">
+                        <span class="nav-icon">💻</span>
+                        <span class="nav-text">Devices</span>
+                    </a>
+                </li>
+
+                <!-- Events Submenu -->
+                <li class="nav-item has-submenu">
+                    <a href="#" class="nav-link submenu-toggle {% if 'Events' in page_title %}active{% endif %}">
+                        <span class="nav-icon">📋</span>
+                        <span class="nav-text">Events</span>
+                        <span class="submenu-arrow">▾</span>
+                    </a>
+                    <ul class="submenu">
+                        <li><a href="/events/auth" class="{% if page_title == 'Auth Events' %}active{% endif %}">Auth
+                                Events</a></li>
+                        <li><a href="/events/flows" class="{% if page_title == 'Flow Events' %}active{% endif %}">Flow
+                                Events</a></li>
+                    </ul>
+                </li>
+
+                <li class="nav-item">
+                    <a href="/models" class="nav-link {% if page_title == 'Models' %}active{% endif %}">
+                        <span class="nav-icon">🤖</span>
+                        <span class="nav-text">Models</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/reports" class="nav-link {% if page_title == 'Reports' %}active{% endif %}">
+                        <span class="nav-icon">📈</span>
+                        <span class="nav-text">Reports</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="status-indicator-wrapper">
+                <span class="status-indicator online"></span>
+                <span class="status-text" id="last-update">Online</span>
+            </div>
         </div>
-    </nav>
+    </aside>
 
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
+    <!-- Main Content Area -->
+    <div class="main-wrapper">
+        <!-- Top Bar (minimal) -->
+        <header class="topbar">
+            <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open menu">☰</button>
+            <div class="topbar-brand">
+                <span class="brand-full">Analytical-Intelligence v1</span>
+            </div>
+            <div class="topbar-status">
+                <span class="status-indicator online"></span>
+                <span id="topbar-last-update">Last update: --</span>
+            </div>
+        </header>
 
-    <footer class="footer">
-        <p>Analytical-Intelligence v1.0 | Real-time Security Intelligence</p>
-    </footer>
+        <main class="container">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="footer">
+            <div class="footer-content">
+                <span class="company">&copy; <span id="current-year"></span> Analytical Intelligence</span>
+                <span class="separator">|</span>
+                <span class="version">Version 1.0</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Mobile Overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
     <script src="/static/app.js"></script>
+    <script>
+        // Sidebar toggle functionality
+        document.addEventListener('DOMContentLoaded', function () {
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+            const overlay = document.getElementById('sidebar-overlay');
+
+            // Desktop toggle (collapse/expand)
+            if (sidebarToggle) {
+                sidebarToggle.addEventListener('click', function () {
+                    sidebar.classList.toggle('collapsed');
+                    localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+                });
+            }
+
+            // Mobile menu toggle
+            if (mobileMenuBtn) {
+                mobileMenuBtn.addEventListener('click', function () {
+                    sidebar.classList.add('mobile-open');
+                    overlay.classList.add('active');
+                });
+            }
+
+            // Close mobile menu on overlay click
+            if (overlay) {
+                overlay.addEventListener('click', function () {
+                    sidebar.classList.remove('mobile-open');
+                    overlay.classList.remove('active');
+                });
+            }
+
+            // Submenu toggle
+            document.querySelectorAll('.submenu-toggle').forEach(function (toggle) {
+                toggle.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const parent = this.parentElement;
+                    parent.classList.toggle('open');
+                });
+            });
+
+            // Restore sidebar state
+            if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                sidebar.classList.add('collapsed');
+            }
+
+            // Keep events submenu open if we're on an events page
+            if (document.querySelector('.submenu-toggle.active')) {
+                document.querySelector('.submenu-toggle.active').parentElement.classList.add('open');
+            }
+
+            // Set current year in footer
+            const yearSpan = document.getElementById('current-year');
+            if (yearSpan) {
+                yearSpan.textContent = new Date().getFullYear();
+            }
+        });
+    </script>
     {% block extra_scripts %}{% endblock %}
 </body>
 

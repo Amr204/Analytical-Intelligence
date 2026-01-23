@@ -1,12 +1,19 @@
 """
 Analytical-Intelligence v1 - Model Loaders
 Gracefully loads ML models with fallback behavior.
+
+Key fixes:
+- Network RF predict(): robust handling for sklearn model.classes_ that may be STRINGS (e.g., 'Normal Traffic')
+  OR numeric class IDs (e.g., 0..n-1). Avoid int('Normal Traffic') crash.
+- Pass feature names to sklearn via pandas.DataFrame to keep correct order and remove warnings.
 """
+
+from __future__ import annotations
 
 import os
 import json
 import logging
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, Union, List
 
 import numpy as np
 
@@ -111,6 +118,8 @@ class SSHLSTMModel:
 # Network RF Model Loader (Random Forest)
 # =====================================================
 
+LabelKey = Union[int, str, np.integer, np.str_]
+
 class NetworkMLModel:
     """
     Network ML model wrapper for Random Forest classifier.
@@ -119,15 +128,19 @@ class NetworkMLModel:
     
     def __init__(self):
         self.model = None
-        self.feature_list: list = []
+        self.feature_list: List[str] = []
         self.label_map: Dict[str, int] = {}
         self.inverse_label_map: Dict[int, str] = {}
         self.median_map: Dict[str, float] = {}
-        self.columns_to_clip: list = []
+        self.columns_to_clip: List[str] = []
         self.metrics: Dict[str, Any] = {}
         self.loaded: bool = False
-        # Benign label for RF model
+
+        # Benign label for RF model (string label)
         self.benign_label: str = "Normal Traffic"
+
+        # Keep a copy for debugging
+        self._classes: Optional[List[Any]] = None
     
     def load(
         self,
@@ -157,25 +170,31 @@ class NetworkMLModel:
             self.model = joblib.load(model_path)
             
             # Verify model has predict_proba (required for confidence scores)
-            if not hasattr(self.model, 'predict_proba'):
-                logger.error("Loaded model does not have predict_proba method")
+            if not hasattr(self.model, "predict_proba"):
+                logger.error("Loaded Network RF model does not have predict_proba method")
                 return False
             
             # Load feature list (52 features with spaces in names)
-            with open(features_path, "r") as f:
+            with open(features_path, "r", encoding="utf-8") as f:
                 self.feature_list = json.load(f)
+            if not isinstance(self.feature_list, list) or not all(isinstance(x, str) for x in self.feature_list):
+                raise ValueError("Invalid feature_list.json (expected list[str])")
             
-            # Load label map
-            with open(labels_path, "r") as f:
+            # Load label map (optional: used if model outputs numeric IDs)
+            with open(labels_path, "r", encoding="utf-8") as f:
                 self.label_map = json.load(f)
-                self.inverse_label_map = {v: k for k, v in self.label_map.items()}
-            
-            # Load preprocess config (optional - may not exist for RF)
+                self.inverse_label_map = {int(v): k for k, v in self.label_map.items()}
+
+            # If benign label exists in label_map, align benign_label string
+            if "Normal Traffic" in self.label_map:
+                self.benign_label = "Normal Traffic"
+
+            # Load preprocess config (optional)
             if os.path.exists(preprocess_path):
-                with open(preprocess_path, "r") as f:
+                with open(preprocess_path, "r", encoding="utf-8") as f:
                     preprocess = json.load(f)
-                    self.median_map = preprocess.get("median_map", {})
-                    self.columns_to_clip = preprocess.get("columns_to_clip", [])
+                    self.median_map = preprocess.get("median_map", {}) or {}
+                    self.columns_to_clip = preprocess.get("columns_to_clip", []) or []
             else:
                 logger.info("No preprocess config found, using defaults")
                 self.median_map = {}
@@ -184,74 +203,150 @@ class NetworkMLModel:
             # Load metrics (optional - for UI display)
             metrics_path = settings.network_metrics_path
             if os.path.exists(metrics_path):
-                with open(metrics_path, "r") as f:
+                with open(metrics_path, "r", encoding="utf-8") as f:
                     self.metrics = json.load(f)
             
+            # Cache model classes for debug
+            classes = getattr(self.model, "classes_", None)
+            if classes is not None:
+                try:
+                    self._classes = list(classes)
+                except Exception:
+                    self._classes = None
+            
             self.loaded = True
-            logger.info(f"Network RF model loaded successfully")
+            logger.info("Network RF model loaded successfully")
             logger.info(f"  - Features: {len(self.feature_list)}")
-            logger.info(f"  - Labels: {list(self.label_map.keys())}")
+            logger.info(f"  - Labels (from label_map): {list(self.label_map.keys())}")
             logger.info(f"  - Benign label: {self.benign_label}")
+            if self._classes is not None:
+                logger.info(f"  - sklearn classes_: {self._classes}")
             return True
             
         except Exception as e:
             logger.error(f"Failed to load Network RF model: {e}")
+            self.model = None
+            self.loaded = False
             return False
     
     def predict(self, features: np.ndarray) -> Tuple[str, float, np.ndarray]:
         """
         Predict attack class for feature vector.
         Returns (label_name, confidence, all_probabilities).
-        
-        Uses sklearn-style predict_proba for Random Forest.
+
+        Robust to sklearn models where:
+        - model.classes_ can be numeric IDs (0..n-1), OR
+        - model.classes_ can be string labels ('Normal Traffic', 'DoS', ...)
+
+        Also passes feature names via pandas.DataFrame (when available)
+        to preserve correct order and remove sklearn warning.
         """
         if not self.loaded or self.model is None:
             return "UNKNOWN", 0.0, np.array([])
-        
+
         try:
-            # Reshape if needed
-            if features.ndim == 1:
-                features = features.reshape(1, -1)
-            
-            # Get prediction probabilities
-            proba = self.model.predict_proba(features)[0]
-            
+            # Ensure 1D vector
+            if features.ndim == 2 and features.shape[0] == 1:
+                row = features[0]
+            elif features.ndim == 1:
+                row = features
+            else:
+                # Unexpected shape
+                row = features.reshape(-1)
+
+            # Validate feature length
+            if self.feature_list and len(row) != len(self.feature_list):
+                logger.warning(
+                    f"Network RF received feature vector length={len(row)} "
+                    f"but expected={len(self.feature_list)}. "
+                    "Prediction may be incorrect."
+                )
+
+            X = self._to_sklearn_input(row)
+
+            # Predict probabilities
+            proba = self.model.predict_proba(X)[0]
             if proba is None or len(proba) == 0:
                 return "UNKNOWN", 0.0, np.array([])
-            
-            # Extract label and score
-            label_id, score = self._extract_label_and_score(proba)
-            label_name = self.inverse_label_map.get(label_id, "UNKNOWN")
-            
+
+            classes = getattr(self.model, "classes_", None)
+            label_key, score = self._extract_label_and_score(proba, classes)
+            label_name = self._label_from_key(label_key)
+
             return label_name, score, proba
-            
+
         except Exception as e:
             logger.error(f"Network RF prediction error: {e}")
             return "UNKNOWN", 0.0, np.array([])
-    
-    def _extract_label_and_score(self, proba: np.ndarray, threshold: float = 0.5) -> Tuple[int, float]:
+
+    def _to_sklearn_input(self, row: np.ndarray):
         """
-        Extract label ID and confidence score from probability array.
-        
-        Args:
-            proba: Probability array (n-class for multiclass)
-            threshold: Threshold for binary classification (default 0.5)
-        
-        Returns:
-            (label_id, score)
+        Convert a 1D feature row into a sklearn-friendly 2D input.
+        Prefer pandas.DataFrame with column names to preserve order.
+        """
+        # Try pandas to preserve feature names (removes sklearn warning)
+        try:
+            import pandas as pd  # type: ignore
+            if self.feature_list:
+                return pd.DataFrame([row], columns=self.feature_list)
+        except Exception:
+            pass
+
+        # Fallback: numpy 2D
+        return np.asarray([row], dtype=float)
+
+    def _extract_label_and_score(
+        self,
+        proba: np.ndarray,
+        classes: Optional[np.ndarray] = None,
+        threshold: float = 0.5
+    ) -> Tuple[LabelKey, float]:
+        """
+        Extract label key (class value) + confidence score from probability array.
+
+        For multiclass: uses argmax.
+        For binary: uses threshold (kept for completeness, although your RF is multiclass).
         """
         num_classes = len(proba)
-        
+
         if num_classes == 2:
-            # Binary classification
-            score = float(proba[1])  # Probability of class 1
-            label_id = 1 if score >= threshold else 0
-            return label_id, score if label_id == 1 else (1.0 - score)
-        else:
-            # Multiclass classification
-            label_id = int(np.argmax(proba))
-            score = float(proba[label_id])
-            return label_id, score
+            score_pos = float(proba[1])
+            is_pos = score_pos >= threshold
+            idx = 1 if is_pos else 0
+            score = score_pos if is_pos else (1.0 - score_pos)
+
+            if classes is not None and len(classes) == 2:
+                return classes[idx], score
+            return idx, score
+
+        # Multiclass
+        argmax_idx = int(np.argmax(proba))
+        score = float(proba[argmax_idx])
+
+        if classes is not None and len(classes) == len(proba):
+            return classes[argmax_idx], score
+
+        # Fallback: class key = argmax index
+        return argmax_idx, score
+
+    def _label_from_key(self, label_key: LabelKey) -> str:
+        """
+        Convert sklearn class value into final label string.
+
+        If model.classes_ are strings -> return them directly.
+        If model.classes_ are numeric -> map via inverse_label_map.
+        """
+        # If it's already a string label, return it
+        if isinstance(label_key, (str, np.str_)):
+            return str(label_key)
+
+        # Numeric path
+        try:
+            label_id = int(label_key)  # works for numpy ints too
+            return self.inverse_label_map.get(label_id, str(label_id))
+        except Exception:
+            # Last resort
+            return str(label_key)
 
 
 # =====================================================

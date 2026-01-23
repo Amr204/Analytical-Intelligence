@@ -34,6 +34,8 @@ logger = logging.getLogger(__name__)
 CONFIG = None
 IDLE_TIMEOUT = int(os.environ.get("FLOW_IDLE_TIMEOUT", "2"))
 ACTIVE_TIMEOUT = int(os.environ.get("FLOW_ACTIVE_TIMEOUT", "5"))
+# Minimum packets per flow to forward (default 1 to capture port scans)
+FLOW_MIN_PKTS = int(os.environ.get("FLOW_MIN_PKTS", "1"))
 
 
 def send_flow_event(flow: dict) -> bool:
@@ -69,7 +71,10 @@ def send_flow_event(flow: dict) -> bool:
 
 
 def flow_to_dict(flow) -> dict:
-    """Convert NFStream flow object to dictionary."""
+    """Convert NFStream flow object to dictionary.
+    
+    Includes all fields needed by network_feature_mapper.py for CIC-IDS2017 features.
+    """
     return {
         "src_ip": flow.src_ip,
         "dst_ip": flow.dst_ip,
@@ -95,13 +100,21 @@ def flow_to_dict(flow) -> dict:
         "dst2src_stddev_ps": flow.dst2src_stddev_ps,
         "dst2src_max_ps": flow.dst2src_max_ps,
         "dst2src_min_ps": flow.dst2src_min_ps,
-        # IAT features
+        # IAT features - ALL fields needed by feature mapper
         "bidirectional_mean_piat_ms": flow.bidirectional_mean_piat_ms,
         "bidirectional_stddev_piat_ms": flow.bidirectional_stddev_piat_ms,
         "bidirectional_max_piat_ms": flow.bidirectional_max_piat_ms,
         "bidirectional_min_piat_ms": flow.bidirectional_min_piat_ms,
+        # Forward IAT (src2dst) - mean, stddev, max, min
         "src2dst_mean_piat_ms": flow.src2dst_mean_piat_ms,
+        "src2dst_stddev_piat_ms": flow.src2dst_stddev_piat_ms,
+        "src2dst_max_piat_ms": flow.src2dst_max_piat_ms,
+        "src2dst_min_piat_ms": flow.src2dst_min_piat_ms,
+        # Backward IAT (dst2src) - mean, stddev, max, min
         "dst2src_mean_piat_ms": flow.dst2src_mean_piat_ms,
+        "dst2src_stddev_piat_ms": flow.dst2src_stddev_piat_ms,
+        "dst2src_max_piat_ms": flow.dst2src_max_piat_ms,
+        "dst2src_min_piat_ms": flow.dst2src_min_piat_ms,
         # TCP flags
         "bidirectional_syn_packets": flow.bidirectional_syn_packets,
         "bidirectional_fin_packets": flow.bidirectional_fin_packets,
@@ -175,8 +188,9 @@ def main():
     for flow in streamer:
         flow_count += 1
         
-        # Skip very short flows (likely noise)
-        if flow.bidirectional_packets < 2:
+        # Skip very short flows based on configurable threshold
+        # Default is 1 to capture port scanning (often single SYN packet)
+        if flow.bidirectional_packets < FLOW_MIN_PKTS:
             continue
         
         flow_dict = flow_to_dict(flow)

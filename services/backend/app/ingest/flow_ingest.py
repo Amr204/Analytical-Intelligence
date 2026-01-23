@@ -105,28 +105,39 @@ async def ingest_flow_event(
                 logger.info(f"Network RF detection DEDUP: {label} (x{new_occurrences})")
             else:
                 # --- Cooldown Logic ---
-                # If no dedup match, check if we are in cooldown for this source IP
+                # If no dedup match, check if we are in cooldown for this (src_ip, label) pair
+                # Changed from per-IP only to per (IP, label) so different attack types
+                # from the same IP can still create detections
                 cooldown_window = settings.ml_cooldown_seconds_per_src
                 cooldown_cutoff = ts - timedelta(seconds=cooldown_window)
                 
                 cooldown_query = text("""
-                    SELECT id 
+                    SELECT id, ts
                     FROM detections 
                     WHERE model_name = 'network_rf'
                     AND src_ip = :src_ip
+                    AND label = :label
                     AND ts > :cutoff
+                    ORDER BY ts DESC
                     LIMIT 1
                 """)
                 
-                # Check for ANY recent detection from this IP
+                # Check for recent detection from this IP with the SAME label
                 result = await session.execute(cooldown_query, {
                     "src_ip": str(src_ip) if src_ip else "",
+                    "label": label,
                     "cutoff": cooldown_cutoff
                 })
-                in_cooldown = result.first()
+                cooldown_hit = result.first()
                 
-                if in_cooldown:
-                     logger.info(f"Network RF detection SUPPRESSED (Cooldown): {label} from {src_ip}")
+                if cooldown_hit:
+                    # Calculate remaining cooldown for informative logging
+                    last_detection_ts = cooldown_hit[1] if len(cooldown_hit) > 1 else None
+                    remaining = "unknown"
+                    if last_detection_ts:
+                        elapsed = (ts - last_detection_ts).total_seconds()
+                        remaining = f"{int(cooldown_window - elapsed)}s"
+                    logger.info(f"Network RF detection SUPPRESSED (Cooldown): {label} from {src_ip}, remaining~{remaining}")
                 else:
                     # Insert new detection with network fields for dedup optimization
                     detection_id = await insert_detection(

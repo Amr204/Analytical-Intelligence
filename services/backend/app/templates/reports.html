@@ -1,0 +1,728 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="reports-layout">
+    <!-- Left Sidebar: Filters Panel -->
+    <aside class="reports-sidebar" id="reports-sidebar">
+        <div class="sidebar-section">
+            <h3 class="sidebar-title">📊 Report Type</h3>
+
+            <!-- Report Type Cards (replaces dropdown) -->
+            <div class="report-type-cards">
+                <input type="hidden" name="report_type" id="report_type_hidden"
+                    value="{{ filters.report_type or 'auth' }}">
+
+                <div class="report-card {% if filters.report_type == 'auth' or not filters.report_type %}selected{% endif %}"
+                    data-type="auth" onclick="selectReportType('auth')">
+                    <span class="report-card-icon">🔐</span>
+                    <div class="report-card-content">
+                        <strong>Auth Detections</strong>
+                        <span>SSH LSTM model</span>
+                    </div>
+                </div>
+
+                <div class="report-card {% if filters.report_type == 'network' %}selected{% endif %}"
+                    data-type="network" onclick="selectReportType('network')">
+                    <span class="report-card-icon">🌐</span>
+                    <div class="report-card-content">
+                        <strong>Network Detections</strong>
+                        <span>Random Forest model</span>
+                    </div>
+                </div>
+
+                <div class="report-card {% if filters.report_type == 'device' %}selected{% endif %}" data-type="device"
+                    onclick="selectReportType('device')">
+                    <span class="report-card-icon">💻</span>
+                    <div class="report-card-content">
+                        <strong>By Device</strong>
+                        <span>Device-specific audit</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <h3 class="sidebar-title">⏱️ Time Range</h3>
+            <div class="time-chips">
+                <button type="button" class="chip {% if filters.last_minutes == 60 %}active{% endif %}"
+                    data-minutes="60" onclick="setTimeRange(60)">1h</button>
+                <button type="button" class="chip {% if filters.last_minutes == 1440 %}active{% endif %}"
+                    data-minutes="1440" onclick="setTimeRange(1440)">24h</button>
+                <button type="button" class="chip {% if filters.last_minutes == 10080 %}active{% endif %}"
+                    data-minutes="10080" onclick="setTimeRange(10080)">7d</button>
+                <button type="button" class="chip {% if filters.last_minutes == 43200 %}active{% endif %}"
+                    data-minutes="43200" onclick="setTimeRange(43200)">30d</button>
+                <button type="button" class="chip {% if not filters.last_minutes %}active{% endif %}" data-minutes=""
+                    onclick="setTimeRange('')">All</button>
+            </div>
+            <input type="hidden" name="last_minutes" id="last_minutes_hidden" value="{{ filters.last_minutes or '' }}">
+        </div>
+
+        <div class="sidebar-section">
+            <h3 class="sidebar-title">🎯 Filters</h3>
+            <form method="get" id="report-form" class="sidebar-filters">
+                <!-- Hidden inputs for card selections -->
+                <input type="hidden" name="report_type" id="form_report_type"
+                    value="{{ filters.report_type or 'auth' }}">
+                <input type="hidden" name="last_minutes" id="form_last_minutes"
+                    value="{{ filters.last_minutes or '' }}">
+
+                <div class="filter-group compact">
+                    <label for="severity">Severity</label>
+                    <select name="severity" id="severity">
+                        <option value="">All Severities</option>
+                        <option value="CRITICAL" {% if filters.severity=='CRITICAL' %}selected{% endif %}>🔴 Critical
+                        </option>
+                        <option value="HIGH" {% if filters.severity=='HIGH' %}selected{% endif %}>🟠 High</option>
+                        <option value="MEDIUM" {% if filters.severity=='MEDIUM' %}selected{% endif %}>🟡 Medium</option>
+                        <option value="LOW" {% if filters.severity=='LOW' %}selected{% endif %}>🟢 Low</option>
+                    </select>
+                </div>
+
+                <div class="filter-group compact" id="device-filter-group">
+                    <label for="device_id">
+                        Device
+                        <span class="filter-hint" id="device-hint">(optional)</span>
+                    </label>
+                    <select name="device_id" id="device_id">
+                        <option value="">All Devices</option>
+                        {% for dev_id in device_ids %}
+                        <option value="{{ dev_id }}" {% if filters.device_id==dev_id %}selected{% endif %}>{{ dev_id }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="sidebar-actions">
+                    <button type="submit" class="btn btn-primary btn-block">
+                        🔍 Apply Filters
+                    </button>
+                    <a href="/reports" class="btn btn-secondary btn-block">Clear All</a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Export Section -->
+        <div class="sidebar-section export-section">
+            <h3 class="sidebar-title">📥 Export</h3>
+            <p class="export-note">
+                <span class="info-icon">ℹ️</span>
+                Export up to 5,000 rows
+            </p>
+            <div class="export-dropdown" id="export-dropdown">
+                <button type="button" class="btn btn-export-main" id="export-btn" {% if not detections %}disabled{%
+                    endif %}>
+                    📥 Export Data ▾
+                </button>
+                <div class="export-menu" id="export-menu">
+                    <button type="button" class="export-option" onclick="exportData('csv')">
+                        📄 Export as CSV
+                    </button>
+                    <button type="button" class="export-option" onclick="exportData('xlsx')">
+                        📊 Export as Excel
+                    </button>
+                </div>
+            </div>
+            <div class="export-status" id="export-status"></div>
+        </div>
+    </aside>
+
+    <!-- Mobile Filter Toggle -->
+    <button class="mobile-filter-toggle" id="mobile-filter-toggle">
+        🔧 Filters &amp; Options
+    </button>
+
+    <!-- Main Content: Dashboard -->
+    <main class="reports-main">
+        <div class="reports-header">
+            <h1>📈 Detection Reports</h1>
+            <p class="subtitle">Real-time analytics and export</p>
+        </div>
+
+        <!-- Active Filters Chips -->
+        {% if filters.report_type or filters.severity or filters.device_id or filters.last_minutes %}
+        <div class="active-filters">
+            <span class="active-label">Active Filters:</span>
+            {% if filters.report_type %}
+            <span class="chip removable" data-filter="report_type">
+                Type: {{ filters.report_type|upper }}
+                <button class="chip-remove" onclick="removeFilter('report_type')">×</button>
+            </span>
+            {% endif %}
+            {% if filters.severity %}
+            <span class="chip removable" data-filter="severity">
+                {{ filters.severity }}
+                <button class="chip-remove" onclick="removeFilter('severity')">×</button>
+            </span>
+            {% endif %}
+            {% if filters.device_id %}
+            <span class="chip removable" data-filter="device_id">
+                📟 {{ filters.device_id }}
+                <button class="chip-remove" onclick="removeFilter('device_id')">×</button>
+            </span>
+            {% endif %}
+            {% if filters.last_minutes %}
+            <span class="chip removable" data-filter="last_minutes">
+                ⏱️ {% if filters.last_minutes == 60 %}1h{% elif filters.last_minutes == 1440 %}24h{% elif
+                filters.last_minutes == 10080 %}7d{% elif filters.last_minutes == 43200 %}30d{% else %}{{
+                filters.last_minutes }}m{% endif %}
+                <button class="chip-remove" onclick="removeFilter('last_minutes')">×</button>
+            </span>
+            {% endif %}
+            <a href="/reports" class="clear-all-link">Clear All</a>
+        </div>
+        {% endif %}
+
+        <!-- KPI Summary Cards -->
+        <div class="kpi-grid" id="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-icon">📊</div>
+                <div class="kpi-content">
+                    <span class="kpi-value" id="kpi-total">{{ detections|length }}</span>
+                    <span class="kpi-label">Total Records</span>
+                </div>
+            </div>
+            <div class="kpi-card critical">
+                <div class="kpi-icon">🔴</div>
+                <div class="kpi-content">
+                    <span class="kpi-value" id="kpi-critical">0</span>
+                    <span class="kpi-label">Critical</span>
+                </div>
+            </div>
+            <div class="kpi-card high">
+                <div class="kpi-icon">🟠</div>
+                <div class="kpi-content">
+                    <span class="kpi-value" id="kpi-high">0</span>
+                    <span class="kpi-label">High</span>
+                </div>
+            </div>
+            <div class="kpi-card medium">
+                <div class="kpi-icon">🟡</div>
+                <div class="kpi-content">
+                    <span class="kpi-value" id="kpi-medium">0</span>
+                    <span class="kpi-label">Medium</span>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">💻</div>
+                <div class="kpi-content">
+                    <span class="kpi-value" id="kpi-devices">0</span>
+                    <span class="kpi-label">Devices</span>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">🏷️</div>
+                <div class="kpi-content">
+                    <span class="kpi-value kpi-label-text" id="kpi-top-label">-</span>
+                    <span class="kpi-label">Top Label</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="charts-row">
+            <!-- Severity Distribution -->
+            <div class="chart-card">
+                <h3 class="chart-title">Severity Distribution</h3>
+                <div class="severity-chart" id="severity-chart">
+                    <div class="bar-chart">
+                        <div class="bar-item">
+                            <span class="bar-label">Critical</span>
+                            <div class="bar-track">
+                                <div class="bar-fill critical" id="bar-critical" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" id="bar-val-critical">0</span>
+                        </div>
+                        <div class="bar-item">
+                            <span class="bar-label">High</span>
+                            <div class="bar-track">
+                                <div class="bar-fill high" id="bar-high" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" id="bar-val-high">0</span>
+                        </div>
+                        <div class="bar-item">
+                            <span class="bar-label">Medium</span>
+                            <div class="bar-track">
+                                <div class="bar-fill medium" id="bar-medium" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" id="bar-val-medium">0</span>
+                        </div>
+                        <div class="bar-item">
+                            <span class="bar-label">Low</span>
+                            <div class="bar-track">
+                                <div class="bar-fill low" id="bar-low" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" id="bar-val-low">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detection Timeline Sparkline -->
+            <div class="chart-card">
+                <h3 class="chart-title">Detection Timeline</h3>
+                <div class="timeline-chart" id="timeline-chart">
+                    <svg class="sparkline" id="sparkline" viewBox="0 0 300 60" preserveAspectRatio="none">
+                        <path class="sparkline-fill" id="sparkline-fill" d=""></path>
+                        <path class="sparkline-line" id="sparkline-line" d=""></path>
+                    </svg>
+                    <div class="timeline-labels">
+                        <span id="timeline-start">-</span>
+                        <span id="timeline-end">Now</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Header -->
+        <div class="results-header">
+            <div class="results-info">
+                <span class="results-count">
+                    📋 Showing <strong>{{ detections|length }}</strong> records
+                    <span class="results-note">(preview limited to 200)</span>
+                </span>
+            </div>
+            <div class="table-actions">
+                <button class="btn btn-sm btn-icon" onclick="copyTableData()" title="Copy to clipboard">
+                    📋
+                </button>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="table-container">
+            {% if detections %}
+            <table class="data-table reports-table" id="reports-table">
+                <thead class="sticky-header">
+                    <tr>
+                        <th class="sortable" data-sort="id" onclick="sortTable('id')">ID ↕</th>
+                        <th class="sortable" data-sort="ts" onclick="sortTable('ts')">Timestamp ↕</th>
+                        <th class="sortable" data-sort="severity" onclick="sortTable('severity')">Severity ↕</th>
+                        <th>Model</th>
+                        <th>Label</th>
+                        <th>Device</th>
+                        <th class="sortable" data-sort="score" onclick="sortTable('score')">Score ↕</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    {% for d in detections %}
+                    <tr class="severity-row-{{ d.severity|lower }}" data-id="{{ d.id }}" data-ts="{{ d.ts }}"
+                        data-severity="{{ d.severity }}" data-score="{{ d.score }}">
+                        <td class="cell-id">{{ d.id }}</td>
+                        <td class="cell-timestamp">{{ d.ts[:19] }}</td>
+                        <td><span class="severity-badge {{ d.severity|lower }}">{{ d.severity }}</span></td>
+                        <td><span class="model-badge {{ d.model_name }}">{{ d.model_name }}</span></td>
+                        <td class="cell-label" title="{{ d.label }}">
+                            <span class="label-text">{{ d.label[:40] }}{% if d.label|length > 40 %}...{% endif %}</span>
+                            <button class="copy-btn" onclick="copyToClipboard('{{ d.label }}')"
+                                title="Copy label">📋</button>
+                        </td>
+                        <td class="cell-device">
+                            <a href="/devices/{{ d.device_id }}">{{ d.device_id }}</a>
+                            <button class="copy-btn" onclick="copyToClipboard('{{ d.device_id }}')"
+                                title="Copy device">📋</button>
+                        </td>
+                        <td class="cell-score">{{ "%.2f"|format(d.score) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <!-- Empty State -->
+            <div class="empty-state-card">
+                <div class="empty-icon">🔍</div>
+                <h3>No Records Found</h3>
+                <p>No detections match the current filters.</p>
+                <a href="/reports" class="btn btn-primary">Clear Filters</a>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+<!-- Mobile Overlay -->
+<div class="reports-overlay" id="reports-overlay"></div>
+
+<!-- Toast Notification -->
+<div class="toast" id="toast"></div>
+{% endblock %}
+
+{# ===================== Reports Page Data + Script (FIXED) ===================== #}
+{% block extra_scripts %}
+
+<!-- 1) Embed server data safely as JSON (NOT JS) -->
+<script id="detections-json" type="application/json">
+    {{ detections | tojson }}
+  </script>
+
+<script id="filters-json" type="application/json">
+    {{ filters | tojson }}
+  </script>
+
+<!-- 2) Read the JSON and run your report logic -->
+<script>
+    (() => {
+        'use strict';
+
+        function parseJSONFromScript(id, fallbackValue) {
+            const el = document.getElementById(id);
+            if (!el) return fallbackValue;
+
+            const raw = (el.textContent || el.innerText || '').trim();
+            if (!raw) return fallbackValue;
+
+            try {
+                return JSON.parse(raw);
+            } catch (err) {
+                console.error(`Failed to parse JSON in <script id="${id}">`, err);
+                return fallbackValue;
+            }
+        }
+
+        // These are ALWAYS valid JS values now:
+        const detections = parseJSONFromScript('detections-json', []);
+        const serverFilters = parseJSONFromScript('filters-json', {});
+
+
+        // ============================================================
+        // INITIALIZATION
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', function () {
+            computeKPIs();
+            renderSeverityChart();
+            renderTimelineSparkline();
+            updateDeviceFilterState();
+            initMobileToggle();
+            initExportDropdown();
+        });
+
+        // ============================================================
+        // KPI COMPUTATION
+        // ============================================================
+        function computeKPIs() {
+            const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+            const devices = new Set();
+            const labels = {};
+
+            detections.forEach(d => {
+                if (d.severity && counts.hasOwnProperty(d.severity)) {
+                    counts[d.severity]++;
+                }
+                if (d.device_id) devices.add(d.device_id);
+                if (d.label) {
+                    labels[d.label] = (labels[d.label] || 0) + 1;
+                }
+            });
+
+            // Update KPI cards
+            document.getElementById('kpi-total').textContent = detections.length;
+            document.getElementById('kpi-critical').textContent = counts.CRITICAL;
+            document.getElementById('kpi-high').textContent = counts.HIGH;
+            document.getElementById('kpi-medium').textContent = counts.MEDIUM;
+            document.getElementById('kpi-devices').textContent = devices.size;
+
+            // Find top label
+            let topLabel = '-';
+            let maxCount = 0;
+            for (const [label, count] of Object.entries(labels)) {
+                if (label && count > maxCount) {
+                    maxCount = count;
+                    topLabel = label.length > 15 ? label.substring(0, 12) + '...' : label;
+                }
+            }
+            document.getElementById('kpi-top-label').textContent = topLabel;
+        }
+
+        // ============================================================
+        // SEVERITY CHART (Pure CSS Bars)
+        // ============================================================
+        function renderSeverityChart() {
+            const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+            detections.forEach(d => {
+                if (d.severity && counts.hasOwnProperty(d.severity)) {
+                    counts[d.severity]++;
+                }
+            });
+
+            const max = Math.max(...Object.values(counts), 1);
+
+            ['critical', 'high', 'medium', 'low'].forEach(sev => {
+                const key = sev.toUpperCase();
+                const pct = (counts[key] / max) * 100;
+                document.getElementById('bar-' + sev).style.width = pct + '%';
+                document.getElementById('bar-val-' + sev).textContent = counts[key];
+            });
+        }
+
+        // ============================================================
+        // TIMELINE SPARKLINE (Pure SVG)
+        // ============================================================
+        function renderTimelineSparkline() {
+            if (detections.length === 0) return;
+
+            // Group detections by hour
+            const buckets = {};
+            detections.forEach(d => {
+                if (!d.ts) return;
+                const hour = d.ts.substring(0, 13); // YYYY-MM-DDTHH
+                buckets[hour] = (buckets[hour] || 0) + 1;
+            });
+
+            const hours = Object.keys(buckets).sort();
+            if (hours.length < 2) return;
+
+            const values = hours.map(h => buckets[h]);
+            const max = Math.max(...values, 1);
+
+            // Build SVG path
+            const width = 300;
+            const height = 50;
+            const padding = 5;
+            const step = (width - padding * 2) / (values.length - 1 || 1);
+
+            let linePath = '';
+            let fillPath = '';
+
+            values.forEach((v, i) => {
+                const x = padding + i * step;
+                const y = height - padding - ((v / max) * (height - padding * 2));
+
+                if (i === 0) {
+                    linePath = `M ${x} ${y}`;
+                    fillPath = `M ${x} ${height - padding}`;
+                }
+                linePath += ` L ${x} ${y}`;
+                fillPath += ` L ${x} ${y}`;
+            });
+
+            fillPath += ` L ${padding + (values.length - 1) * step} ${height - padding} Z`;
+
+            document.getElementById('sparkline-line').setAttribute('d', linePath);
+            document.getElementById('sparkline-fill').setAttribute('d', fillPath);
+
+            // Update labels
+            if (hours.length > 0) {
+                document.getElementById('timeline-start').textContent = hours[0].substring(5, 10);
+                document.getElementById('timeline-end').textContent = hours[hours.length - 1].substring(5, 10);
+            }
+        }
+
+        // ============================================================
+        // REPORT TYPE SELECTION
+        // ============================================================
+        function selectReportType(type) {
+            document.querySelectorAll('.report-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.querySelector('.report-card[data-type="' + type + '"]').classList.add('selected');
+            document.getElementById('form_report_type').value = type;
+            updateDeviceFilterState();
+        }
+
+        // ============================================================
+        // TIME RANGE SELECTION
+        // ============================================================
+        function setTimeRange(minutes) {
+            document.querySelectorAll('.time-chips .chip').forEach(chip => {
+                chip.classList.remove('active');
+            });
+            const btn = document.querySelector('.time-chips .chip[data-minutes="' + minutes + '"]');
+            if (btn) btn.classList.add('active');
+            document.getElementById('form_last_minutes').value = minutes;
+        }
+
+        // ============================================================
+        // DEVICE FILTER STATE
+        // ============================================================
+        function updateDeviceFilterState() {
+            const reportType = document.getElementById('form_report_type').value;
+            const deviceGroup = document.getElementById('device-filter-group');
+            const deviceSelect = document.getElementById('device_id');
+            const hint = document.getElementById('device-hint');
+
+            if (reportType === 'device') {
+                deviceGroup.classList.add('required');
+                deviceGroup.classList.remove('optional');
+                deviceSelect.required = true;
+                hint.textContent = '(required)';
+            } else {
+                deviceGroup.classList.remove('required');
+                deviceGroup.classList.add('optional');
+                deviceSelect.required = false;
+                hint.textContent = '(optional)';
+            }
+        }
+
+        // ============================================================
+        // FILTER CHIP REMOVAL
+        // ============================================================
+        function removeFilter(filterName) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete(filterName);
+            window.location.href = url.toString();
+        }
+
+        // ============================================================
+        // TABLE SORTING (Client-side)
+        // ============================================================
+        let sortState = { column: null, direction: 'asc' };
+
+        function sortTable(column) {
+            const tbody = document.getElementById('table-body');
+            if (!tbody) return;
+
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            if (sortState.column === column) {
+                sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState.column = column;
+                sortState.direction = 'asc';
+            }
+
+            rows.sort((a, b) => {
+                let valA = a.dataset[column] || '';
+                let valB = b.dataset[column] || '';
+
+                if (column === 'id' || column === 'score') {
+                    valA = parseFloat(valA) || 0;
+                    valB = parseFloat(valB) || 0;
+                } else if (column === 'severity') {
+                    const order = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+                    valA = order[valA] || 0;
+                    valB = order[valB] || 0;
+                }
+
+                if (valA < valB) return sortState.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return sortState.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+
+            // Update header indicators
+            document.querySelectorAll('.sortable').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+            const th = document.querySelector('.sortable[data-sort="' + column + '"]');
+            if (th) th.classList.add('sort-' + sortState.direction);
+        }
+
+        // ============================================================
+        // EXPORT FUNCTIONALITY
+        // ============================================================
+        function initExportDropdown() {
+            const btn = document.getElementById('export-btn');
+            const menu = document.getElementById('export-menu');
+
+            if (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    menu.classList.toggle('show');
+                });
+            }
+
+            document.addEventListener('click', function () {
+                if (menu) menu.classList.remove('show');
+            });
+        }
+
+        function exportData(format) {
+            const params = new URLSearchParams();
+            params.set('format', format);
+            params.set('type', document.getElementById('form_report_type').value || 'auth');
+
+            const severity = document.getElementById('severity').value;
+            if (severity) params.set('severity', severity);
+
+            const deviceId = document.getElementById('device_id').value;
+            if (deviceId) params.set('device_id', deviceId);
+
+            const lastMinutes = document.getElementById('form_last_minutes').value;
+            if (lastMinutes) params.set('last_minutes', lastMinutes);
+
+            // Show status
+            showToast('Exporting ' + format.toUpperCase() + '...', 'info');
+
+            // Trigger download
+            window.location.href = '/api/v1/reports/export?' + params.toString();
+
+            // Hide dropdown
+            document.getElementById('export-menu').classList.remove('show');
+
+            // Show success message after delay
+            setTimeout(() => {
+                showToast('Export started! Check your downloads.', 'success');
+            }, 1000);
+        }
+
+        // ============================================================
+        // MOBILE TOGGLE
+        // ============================================================
+        function initMobileToggle() {
+            const toggle = document.getElementById('mobile-filter-toggle');
+            const sidebar = document.getElementById('reports-sidebar');
+            const overlay = document.getElementById('reports-overlay');
+
+            if (toggle) {
+                toggle.addEventListener('click', function () {
+                    sidebar.classList.toggle('mobile-open');
+                    overlay.classList.toggle('active');
+                });
+            }
+
+            if (overlay) {
+                overlay.addEventListener('click', function () {
+                    sidebar.classList.remove('mobile-open');
+                    overlay.classList.remove('active');
+                });
+            }
+        }
+
+        // ============================================================
+        // UTILITY FUNCTIONS
+        // ============================================================
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Copied: ' + text.substring(0, 30) + (text.length > 30 ? '...' : ''), 'success');
+            });
+        }
+
+        function copyTableData() {
+            const table = document.getElementById('reports-table');
+            if (!table) return;
+
+            const rows = table.querySelectorAll('tr');
+            let text = '';
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('th, td');
+                const rowData = Array.from(cells).map(c => c.textContent.trim()).join('\t');
+                text += rowData + '\n';
+            });
+
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Table data copied to clipboard!', 'success');
+            });
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show ' + type;
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Expose functions to global scope for onclick handlers
+        window.selectReportType = selectReportType;
+        window.setTimeRange = setTimeRange;
+        window.removeFilter = removeFilter;
+        window.sortTable = sortTable;
+        window.exportData = exportData;
+        window.copyToClipboard = copyToClipboard;
+        window.copyTableData = copyTableData;
+    })();
+</script>
+{% endblock %}

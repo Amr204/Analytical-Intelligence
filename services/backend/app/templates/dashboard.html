@@ -42,18 +42,25 @@
             <h2>Detections by Severity</h2>
             <div class="severity-bars">
                 {% set severity_colors = {'CRITICAL': 'critical', 'HIGH': 'high', 'MEDIUM': 'medium', 'LOW': 'low'} %}
-                {% for severity, count in stats.detections_by_severity.items() %}
+                {% set severity_order = ['CRITICAL','HIGH','MEDIUM','LOW'] %}
+                {% set total = stats.total_detections or 1 %}
+
+                {% for sev in severity_order %}
+                {% set count = stats.detections_by_severity.get(sev, 0) %}
+                {% set pct = ((count / total) * 100) | round(2) %}
+
                 <div class="severity-row">
-                    <span class="severity-badge {{ severity_colors.get(severity, 'low') }}">{{ severity }}</span>
+                    <span class="severity-badge {{ severity_colors.get(sev, 'low') }}">{{ sev }}</span>
                     <div class="severity-bar-container">
-                        <div class="severity-bar {{ severity_colors.get(severity, 'low') }}"
-                            style="width: {{ (count / (stats.total_detections or 1)) * 100 }}%"></div>
+                        <div class="severity-bar {{ severity_colors.get(sev, 'low') }}" data-width="{{ pct }}"
+                            aria-label="{{ sev }}: {{ pct }} percent"></div>
                     </div>
                     <span class="severity-count">{{ count }}</span>
                 </div>
                 {% endfor %}
             </div>
         </div>
+
 
         <div class="section-card">
             <h2>Events by Type</h2>
@@ -119,4 +126,18 @@
         </div>
     </div>
 </div>
+<script>
+    (() => {
+        'use strict';
+
+        const bars = document.querySelectorAll('.severity-bar[data-width]');
+        for (const el of bars) {
+            const w = Number.parseFloat(el.dataset.width || '0');
+            // Clamp 0..100 to avoid layout weirdness
+            const clamped = Number.isFinite(w) ? Math.max(0, Math.min(100, w)) : 0;
+            el.style.width = `${clamped}%`;
+        }
+    })();
+</script>
+
 {% endblock %}

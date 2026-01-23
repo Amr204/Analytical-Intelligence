@@ -5,9 +5,11 @@ Server-rendered HTML pages using Jinja2 templates.
 
 from datetime import datetime
 from typing import Optional
+from io import StringIO, BytesIO
+import csv
 
 from fastapi import APIRouter, Request, Depends, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -209,3 +211,157 @@ async def api_device_detail(
     if not data:
         return {"error": "Device not found"}
     return data
+
+
+# =====================================================
+# REPORTS PAGE
+# =====================================================
+
+@router.get("/reports", response_class=HTMLResponse)
+async def reports_page(
+    request: Request,
+    report_type: Optional[str] = Query("auth"),
+    severity: Optional[str] = Query(None),
+    device_id: Optional[str] = Query(None),
+    last_minutes: Optional[int] = Query(None),
+    session: AsyncSession = Depends(get_session)
+):
+    """Reports page with filtering and export options."""
+    # Map report_type to model_name filter
+    model_name = None
+    if report_type == "auth":
+        model_name = "ssh_lstm"
+    elif report_type == "network":
+        model_name = "network_rf"
+    # "device" type uses no model filter, just device_id
+    
+    # Get filtered detections for preview (limit 200)
+    detections = await get_detections_filtered(
+        session,
+        severity=severity,
+        model_name=model_name,
+        device_id=device_id if report_type == "device" else device_id,
+        last_minutes=last_minutes,
+        limit=200  # Safe preview limit
+    )
+    
+    # Get device list for filter dropdown
+    device_ids = await get_all_device_ids(session)
+    
+    return templates.TemplateResponse("reports.html", {
+        "request": request,
+        "detections": detections,
+        "device_ids": device_ids,
+        "filters": {
+            "report_type": report_type,
+            "severity": severity,
+            "device_id": device_id,
+            "last_minutes": last_minutes
+        },
+        "page_title": "Reports",
+        "now": datetime.utcnow().isoformat()
+    })
+
+
+# =====================================================
+# REPORTS EXPORT API
+# =====================================================
+
+@router.get("/api/v1/reports/export")
+async def export_report(
+    type: str = Query(..., description="Report type: auth, network, or device"),
+    format: str = Query("csv", description="Export format: csv or xlsx"),
+    severity: Optional[str] = Query(None),
+    device_id: Optional[str] = Query(None),
+    last_minutes: Optional[int] = Query(None),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Export detections as CSV or XLSX.
+    
+    Safety limits:
+    - Maximum 5000 rows per export
+    - Validates type and format parameters
+    """
+    # Validate type
+    if type not in ("auth", "network", "device"):
+        return {"error": "Invalid report type. Use: auth, network, or device"}
+    
+    # Validate format
+    if format not in ("csv", "xlsx"):
+        return {"error": "Invalid format. Use: csv or xlsx"}
+    
+    # Map type to model_name
+    model_name = None
+    if type == "auth":
+        model_name = "ssh_lstm"
+    elif type == "network":
+        model_name = "network_rf"
+    
+    # Get filtered detections (max 5000)
+    detections = await get_detections_filtered(
+        session,
+        severity=severity,
+        model_name=model_name,
+        device_id=device_id if type == "device" else device_id,
+        last_minutes=last_minutes,
+        limit=5000  # Safety limit for exports
+    )
+    
+    # Prepare data rows
+    headers = ["ID", "Timestamp", "Severity", "Model", "Label", "Device", "Score", "Occurrences"]
+    rows = []
+    for d in detections:
+        rows.append([
+            d.get("id", ""),
+            d.get("ts", "")[:19] if d.get("ts") else "",
+            d.get("severity", ""),
+            d.get("model_name", ""),
+            d.get("label", ""),
+            d.get("device_id", ""),
+            d.get("score", 0),
+            d.get("occurrences", 1)
+        ])
+    
+    # Generate filename
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"report_{type}_{timestamp}"
+    
+    if format == "csv":
+        # Generate CSV
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(headers)
+        writer.writerows(rows)
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}.csv"
+            }
+        )
+    
+    elif format == "xlsx":
+        # Generate XLSX using openpyxl via pandas
+        try:
+            import pandas as pd
+            
+            df = pd.DataFrame(rows, columns=headers)
+            output = BytesIO()
+            
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                df.to_excel(writer, sheet_name="Detections", index=False)
+            
+            output.seek(0)
+            
+            return StreamingResponse(
+                output,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={
+                    "Content-Disposition": f"attachment; filename={filename}.xlsx"
+                }
+            )
+        except ImportError:
+            return {"error": "XLSX export requires pandas and openpyxl. Please install: pip install pandas openpyxl"}
+

@@ -4,8 +4,14 @@ Maps NFStream flow data to CIC-IDS2017 feature format for Random Forest model.
 
 The RF model expects 52 features with specific names containing spaces.
 NFStream provides different field names, so this module handles the mapping.
+
+UNIT CONVENTION:
+- NFStream provides IAT values in MILLISECONDS (ms)
+- CIC-IDS2017 training data uses MICROSECONDS (µs)
+- All IAT-related features are converted: ms * 1000 = µs
 """
 
+import os
 import numpy as np
 from typing import Dict, Any, List, Tuple
 import logging
@@ -13,6 +19,10 @@ import logging
 from app.models_loader import network_ml_model
 
 logger = logging.getLogger(__name__)
+
+# Environment-configurable minimum duration for rate calculations
+# If duration_ms < this value, rate features are set to 0 to avoid inflation
+MIN_FLOW_DURATION_MS = int(os.environ.get("MIN_FLOW_DURATION_MS", "50"))
 
 
 def normalize_feature_name(name: str) -> str:
@@ -61,6 +71,7 @@ FEATURE_MAPPING = {
     "SubflowFwdBytes": "src2dst_bytes",
 
     # IAT features - NFStream provides these in milliseconds
+    # Will be converted to microseconds during mapping
     "FlowIATMean": "bidirectional_mean_piat_ms",
     "FlowIATStd": "bidirectional_stddev_piat_ms",
     "FlowIATMax": "bidirectional_max_piat_ms",
@@ -109,6 +120,14 @@ FEATURE_MAPPING = {
     "IdleMin": None,
 }
 
+# IAT features that need ms -> µs conversion (multiply by 1000)
+# CIC-IDS2017 training data uses microseconds for all IAT values
+IAT_FEATURES_TO_CONVERT_MS_TO_US = {
+    "FlowIATMean", "FlowIATStd", "FlowIATMax", "FlowIATMin",
+    "FwdIATTotal", "FwdIATMean", "FwdIATStd", "FwdIATMax", "FwdIATMin",
+    "BwdIATTotal", "BwdIATMean", "BwdIATStd", "BwdIATMax", "BwdIATMin",
+}
+
 
 def map_flow_to_features(flow_data: Dict[str, Any]) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
@@ -120,7 +139,7 @@ def map_flow_to_features(flow_data: Dict[str, Any]) -> Tuple[np.ndarray, Dict[st
     Returns:
         Tuple of (feature_vector, debug_info)
         - feature_vector: numpy array of shape (52,) matching feature_list order
-        - debug_info: dict with missing features info for logging
+        - debug_info: dict with mapping statistics for logging
     """
     if not network_ml_model.loaded:
         return np.array([]), {}
@@ -130,11 +149,20 @@ def map_flow_to_features(flow_data: Dict[str, Any]) -> Tuple[np.ndarray, Dict[st
     
     features = np.zeros(len(feature_list), dtype=np.float64)
     missing_features = []
+    mapped_count = 0
+    fallback_count = 0
     
     # Pre-compute common values
     duration_ms = flow_data.get("bidirectional_duration_ms", 0) or 0
-    duration_sec = max(duration_ms / 1000.0, 0.001)  # Avoid division by zero
     duration_us = duration_ms * 1000  # Convert to microseconds for CIC-IDS format
+    
+    # For rate features: if duration too small, use 0 to prevent artificial inflation
+    # This prevents tiny/zero duration flows from generating extreme PPS/BPS values
+    # that the RF model interprets as DDoS characteristics
+    if duration_ms >= MIN_FLOW_DURATION_MS:
+        rate_safe_duration_sec = duration_ms / 1000.0
+    else:
+        rate_safe_duration_sec = 0.0  # Will result in rate features = 0
     
     total_bytes = flow_data.get("bidirectional_bytes", 0) or 0
     total_packets = flow_data.get("bidirectional_packets", 0) or 0
@@ -150,10 +178,12 @@ def map_flow_to_features(flow_data: Dict[str, Any]) -> Tuple[np.ndarray, Dict[st
         nfstream_field = FEATURE_MAPPING.get(normalized_name)
         
         value = None
+        was_mapped = False
         
         # Try direct mapping first
         if nfstream_field and nfstream_field in flow_data:
             value = flow_data.get(nfstream_field)
+            was_mapped = True
             
             # Special handling for FlowDuration (ms to microseconds)
             if normalized_name == "FlowDuration" and value is not None:
@@ -162,16 +192,17 @@ def map_flow_to_features(flow_data: Dict[str, Any]) -> Tuple[np.ndarray, Dict[st
         # Compute derived features if no direct mapping
         if value is None:
             if normalized_name == "FlowBytes/s":
-                value = total_bytes / duration_sec if duration_sec > 0 else 0.0
+                # Use safe duration to prevent inflation
+                value = total_bytes / rate_safe_duration_sec if rate_safe_duration_sec > 0 else 0.0
                 
             elif normalized_name == "FlowPackets/s":
-                value = total_packets / duration_sec if duration_sec > 0 else 0.0
+                value = total_packets / rate_safe_duration_sec if rate_safe_duration_sec > 0 else 0.0
                 
             elif normalized_name == "FwdPackets/s":
-                value = fwd_packets / duration_sec if duration_sec > 0 else 0.0
+                value = fwd_packets / rate_safe_duration_sec if rate_safe_duration_sec > 0 else 0.0
                 
             elif normalized_name == "BwdPackets/s":
-                value = bwd_packets / duration_sec if duration_sec > 0 else 0.0
+                value = bwd_packets / rate_safe_duration_sec if rate_safe_duration_sec > 0 else 0.0
                 
             elif normalized_name == "AveragePacketSize":
                 value = total_bytes / total_packets if total_packets > 0 else 0.0
@@ -180,29 +211,45 @@ def map_flow_to_features(flow_data: Dict[str, Any]) -> Tuple[np.ndarray, Dict[st
                 value = std_ps ** 2 if std_ps else 0.0
                 
             elif normalized_name == "FwdIATTotal":
-                # Approximate: mean IAT * (packets - 1)
+                # Approximate: mean IAT * (packets - 1), then convert ms → µs
                 mean_iat = flow_data.get("src2dst_mean_piat_ms", 0) or 0
-                value = mean_iat * max(fwd_packets - 1, 0)
+                value = mean_iat * max(fwd_packets - 1, 0) * 1000  # ms → µs
+                was_mapped = True  # Derived from real data
                 
             elif normalized_name == "BwdIATTotal":
                 mean_iat = flow_data.get("dst2src_mean_piat_ms", 0) or 0
-                value = mean_iat * max(bwd_packets - 1, 0)
+                value = mean_iat * max(bwd_packets - 1, 0) * 1000  # ms → µs
+                was_mapped = True  # Derived from real data
+        
+        # Convert IAT features from ms to µs (CIC-IDS2017 uses microseconds)
+        if normalized_name in IAT_FEATURES_TO_CONVERT_MS_TO_US and value is not None:
+            if normalized_name not in ("FwdIATTotal", "BwdIATTotal"):  # Already converted above
+                value = value * 1000  # ms → µs
         
         # Use median from preprocess config if available, otherwise 0.0
         if value is None:
             value = median_map.get(feature_name, 0.0)
             if feature_name not in median_map:
                 missing_features.append(feature_name)
+            fallback_count += 1
+        elif was_mapped:
+            mapped_count += 1
         
         # Handle NaN/Inf
         if value is None or not np.isfinite(value):
             value = median_map.get(feature_name, 0.0)
+            fallback_count += 1
+            mapped_count = max(0, mapped_count - 1)  # Adjust if previously counted
         
         features[i] = float(value)
     
     debug_info = {
+        "mapped_count": mapped_count,
+        "fallback_count": fallback_count,
         "missing_features_count": len(missing_features),
         "total_features": len(feature_list),
+        "duration_ms": duration_ms,
+        "rate_safe": rate_safe_duration_sec > 0,
     }
     
     if missing_features and len(missing_features) < 10:

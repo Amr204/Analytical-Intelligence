@@ -98,7 +98,22 @@ docker compose -f docker-compose.sensor.yml down
 > ```
 > The `-v` flag deletes database volumes. Only use for complete reset.
 
----
+> [!caution]
+> **Delete Everything**
+>
+> ⚠️ **تحذير:** هذه الأوامر ستحذف *كل شيء* متعلق بـ Docker  
+> (الحاويات، الصور، الشبكات، الـ volumes، والـ cache).
+>
+> ```bash
+> docker compose -f docker-compose.analysis.yml down -v --remove-orphans || true
+> docker rm -f $(docker ps -aq) 2>/dev/null || true
+> docker volume rm $(docker volume ls -q) 2>/dev/null || true
+> docker network prune -f
+> docker image prune -a -f
+> docker builder prune -a -f
+> docker system prune -a -f
+> ```
+
 
 ## Reboot Recovery
 

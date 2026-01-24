@@ -4,69 +4,146 @@
 
 ---
 
-## Table of Contents
+## 📋 Table of Contents
 
-- [Prerequisites](#prerequisites)
+- [Requirements](#requirements)
+- [Ubuntu Server Installation](#ubuntu-server-installation)
+- [Disk Expansion](#disk-expansion)
 - [Analysis Server Setup](#analysis-server-setup)
 - [Sensor Server Setup](#sensor-server-setup)
 - [Post-Installation Verification](#post-installation-verification)
 - [Multi-Sensor Deployment](#multi-sensor-deployment)
-- [Next Steps](#next-steps)
 
 ---
 
-## Prerequisites
+## Requirements
 
 ### Hardware Requirements
 
-| Server | RAM | Disk | Purpose |
-|--------|-----|------|---------|
-| Analysis | 4GB+ | 20GB+ | Backend, Database, ML |
-| Sensor | 2GB+ | 10GB+ | Collectors |
-
-### Software Requirements
-
-- Ubuntu 22.04 LTS (both servers)
-- Docker (installed during setup)
-- Network connectivity between servers
+| Server | OS | RAM | CPU | Disk |
+|--------|-----|-----|-----|------|
+| **Analysis Server** | Ubuntu Server 22.04 | 4 GB | 4 cores | 40 GB |
+| **Sensor Server** | Ubuntu Server 22.04 | 4 GB | 4 cores | 40 GB |
 
 ### Network Requirements
 
-- Both servers on same network (e.g., `192.168.1.0/24`)
+- Both servers on the same network (e.g., `192.168.1.0/24`)
 - Port 8000 open on Analysis server
 - Port 22 open for SSH access
+
+### Software Requirements (Windows)
+
+| Software | Description | Link |
+|----------|-------------|------|
+| **VMware Workstation** | Run virtual machines | [Download VMware](https://www.vmware.com/products/workstation-pro/workstation-pro-evaluation.html) |
+| **MobaXterm** | SSH client for Windows | [Download MobaXterm](https://mobaxterm.mobatek.net/download.html) |
+| **Ubuntu Server 22.04** | Server operating system | [Download Ubuntu Server](https://ubuntu.com/download/server) |
+
+---
+
+## Ubuntu Server Installation
+
+### Create Virtual Machine in VMware
+
+1. **New Virtual Machine** → **Typical**
+2. **Installer disc image file (iso)** → Select Ubuntu Server ISO
+3. **Specifications:**
+   - Memory: **4096 MB** (4 GB)
+   - Processors: **4**
+   - Hard Disk: **40 GB**
+
+### Installation Settings
+
+**For Analyzer (Analysis Server):**
+
+| Field | Value |
+|-------|-------|
+| Your name | `analyzer` |
+| Your server's name | `ubuntu-analyzer` |
+| Pick a username | `analyzer` |
+| Choose a password | `analyzer` |
+
+**For Sensor (Sensor Server):**
+
+| Field | Value |
+|-------|-------|
+| Your name | `server` |
+| Your server's name | `ubuntu-server` |
+| Pick a username | `server` |
+| Choose a password | `server` |
+
+> [!IMPORTANT]
+> Make sure to enable **Install OpenSSH server** ✓
+
+---
+
+## Disk Expansion
+
+> [!WARNING]
+> **This step is required** - Ubuntu Server uses only part of the disk by default
+
+**Run these commands on both servers:**
+
+```bash
+# Show partitions
+lsblk
+
+# Check current space
+df -h /
+
+# Expand partition
+sudo growpart /dev/sda 3
+
+# Expand Physical Volume
+sudo pvresize /dev/sda3
+
+# Expand Logical Volume
+sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv
+
+# Expand filesystem
+sudo resize2fs /dev/ubuntu-vg/ubuntu-lv
+
+# Verify expansion
+df -h /
+```
+
+**Expected result:**
+```
+Filesystem                         Size  Used Avail Use% Mounted on
+/dev/mapper/ubuntu--vg-ubuntu--lv   39G  3.5G   34G   9% /
+```
 
 ---
 
 ## Analysis Server Setup
 
-### Step 1: Update System
+### 1. Update System
 
 ```bash
 sudo apt update && sudo apt upgrade -y
 ```
 
-### Step 2: Install Docker
+### 2. Install Docker
 
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER
 ```
 
-**Log out and back in** to apply group changes:
+**Log out and reconnect:**
 ```bash
 exit
-# Reconnect via SSH
+# Reconnect via MobaXterm
 ```
 
-### Step 3: Verify Docker
+### 3. Verify Docker
 
 ```bash
 docker --version
 docker compose version
 ```
 
-### Step 4: Clone Repository
+### 4. Clone Repository
 
 ```bash
 cd ~
@@ -74,97 +151,63 @@ git clone https://github.com/Amr204/Analytical-Intelligence.git
 cd Analytical-Intelligence
 ```
 
-### Step 5: Configure Environment
+### 5. Configure Environment
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-**Minimum required settings for Analysis server:**
+**Edit:**
 ```bash
-# Change this to a secure key!
 INGEST_API_KEY=<YOUR_SECURE_API_KEY>
 ```
 
-Save: `Ctrl+X` → `Y` → `Enter`
-
-### Step 6: Verify Models
+### 6. Verify Models
 
 ```bash
 ls -la models/ssh/
-# Expected: ssh_lstm.joblib
-
 ls -la models/RF/
-# Expected: random_forest.joblib, feature_list.json, label_map.json
 ```
 
-### Step 7: Start Analysis Stack
+### 7. Start Analysis Stack
 
 ```bash
 bash scripts/analysis_up.sh
 ```
 
-**First run takes 5-10 minutes** (building images).
+**First run takes 5-10 minutes**
 
-Expected output:
-```
-==============================================
-Analytical-Intelligence Analysis Stack Startup
-==============================================
-✓ BuildKit enabled (faster rebuilds with pip cache)
-
-Checking ML models...
-  ✓ SSH LSTM model found
-  ✓ Network RF model found
-
-Starting Analysis Stack...
-[+] Running 2/2
- ✔ Container ai_db-postgres  Started
- ✔ Container ai_db-backend   Started
-
-==============================================
-Analysis Stack Ready!
-==============================================
-Dashboard: http://localhost:8000
-```
-
-### Step 8: Verify Health
+### 8. Verify Startup
 
 ```bash
+docker ps
 curl -s http://localhost:8000/api/v1/health | jq
-```
-
-Expected:
-```json
-{"status": "ok", "timestamp": "...", "version": "1.0.0"}
 ```
 
 ---
 
 ## Sensor Server Setup
 
-### Step 1: Install Docker
+### 1. Install Docker
 
 ```bash
 sudo apt update && sudo apt upgrade -y
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER
 exit
-# Reconnect via SSH
+# Reconnect via MobaXterm
 ```
 
-### Step 2: Test Connectivity to Analysis Server
+### 2. Test Connectivity to Analysis Server
 
 ```bash
-# Replace <ANALYZER_IP> with your Analysis server IP
+# Replace <ANALYZER_IP> with Analysis server IP
 ping -c 4 <ANALYZER_IP>
 curl -s http://<ANALYZER_IP>:8000/api/v1/health
 ```
 
-If curl fails, check Analysis server firewall (see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)).
-
-### Step 3: Clone Repository
+### 3. Clone Repository
 
 ```bash
 cd ~
@@ -172,106 +215,77 @@ git clone https://github.com/Amr204/Analytical-Intelligence.git
 cd Analytical-Intelligence
 ```
 
-### Step 4: Find Network Interface
+### 4. Find Network Interface
 
 ```bash
 ip link show
 ```
 
-Look for your main interface (usually `ens33`, `eth0`, or `enp0s3`).
+**Usually: `ens33`, `eth0`, or `enp0s3`**
 
-### Step 5: Configure Environment
+### 5. Configure Environment
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-**Required settings for Sensor server:**
+**Edit:**
 ```bash
-# Analysis server IP (NO http://, NO port)
 ANALYZER_HOST=<ANALYZER_IP>
-
-# Must match Analysis server's key!
 INGEST_API_KEY=<YOUR_SECURE_API_KEY>
-
-# MUST BE UNIQUE for each sensor!
 DEVICE_ID=sensor-01
-
-# Human-readable name
 HOSTNAME=sensor-server
-
-# Your network interface
 NET_IFACE=ens33
 ```
 
-Save: `Ctrl+X` → `Y` → `Enter`
-
-### Step 6: Start Sensor Stack
+### 6. Start Sensor Stack
 
 ```bash
 bash scripts/sensor_up.sh
 ```
 
-Expected output:
-```
-==============================================
-Analytical-Intelligence Sensor Stack Startup
-==============================================
-✓ BuildKit enabled (faster rebuilds with pip cache)
+### 7. Verify Startup
 
-Starting Sensor Stack...
-[+] Running 2/2
- ✔ Container ai_db-auth-collector  Started
- ✔ Container ai_db-flow-collector  Started
-
-==============================================
-Sensor Stack Started!
-==============================================
-Device ID: sensor-01
-Hostname:  sensor-server
-Sending to: <ANALYZER_IP>
+```bash
+docker ps
 ```
+
+**Expected:** `ai_db-auth-collector` and `ai_db-flow-collector` both "Up"
 
 ---
 
 ## Post-Installation Verification
 
-### 1. Check Devices Page
+### 1. Devices Page
 
-Open in browser:
 ```
 http://<ANALYZER_IP>:8000/devices
 ```
 
-Your sensor should appear with:
-- Device ID: `sensor-01`
-- Status: Online
-- Last seen: Recent timestamp
+Sensor should appear with Online status.
 
-### 2. Check Container Status
+### 2. Container Status
 
 **On Analysis server:**
 ```bash
 docker ps
+# Expected: ai_db-postgres and ai_db-backend
 ```
-Expected: `ai_db-postgres` and `ai_db-backend` both "Up"
 
 **On Sensor server:**
 ```bash
 docker ps
+# Expected: ai_db-auth-collector and ai_db-flow-collector
 ```
-Expected: `ai_db-auth-collector` and `ai_db-flow-collector` both "Up"
 
-### 3. Check Logs
+### 3. Logs
 
-**Analysis server:**
 ```bash
+# Analysis server
 docker compose -f docker-compose.analysis.yml logs -f backend
-```
 
-**Sensor server:**
-```bash
+# Sensor server
 docker compose -f docker-compose.sensor.yml logs -f
 ```
 
@@ -279,40 +293,26 @@ docker compose -f docker-compose.sensor.yml logs -f
 
 ## Multi-Sensor Deployment
 
-To add additional sensors:
-
 > [!IMPORTANT]
 > **Each sensor MUST have a unique `DEVICE_ID`**
 
 ### On Each New Sensor:
 
 1. Follow [Sensor Server Setup](#sensor-server-setup)
-2. In `.env`, set a unique `DEVICE_ID`:
+2. In `.env`, use a unique `DEVICE_ID`:
    ```bash
-   DEVICE_ID=sensor-02   # Different from other sensors!
+   DEVICE_ID=sensor-02
    HOSTNAME=datacenter-sensor
    ```
-3. Start the sensor stack
+3. Run `bash scripts/sensor_up.sh`
 
-### Verify All Sensors
+### Verify
 
-Check the devices page:
 ```
 http://<ANALYZER_IP>:8000/devices
 ```
 
-All sensors should appear with their unique IDs.
-
----
-
-## Next Steps
-
-| Task | Document |
-|------|----------|
-| Daily operations | [OPERATIONS.md](OPERATIONS.md) |
-| Test with attacks | [README.md](../README.md#-اختبار-النظام-بهجمات-حقيقية) |
-| Troubleshooting | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) |
-| Security hardening | [SECURITY.md](SECURITY.md) |
+All sensors should appear.
 
 ---
 
@@ -322,3 +322,14 @@ All sensors should appear with their unique IDs.
 |--------|---------------|--------------|
 | Analysis | `bash scripts/analysis_up.sh` | `docker compose -f docker-compose.analysis.yml down` |
 | Sensor | `bash scripts/sensor_up.sh` | `docker compose -f docker-compose.sensor.yml down` |
+
+---
+
+## Next Steps
+
+| Task | Document |
+|------|----------|
+| Daily operations | [OPERATIONS.md](OPERATIONS.md) |
+| Test with attacks | [README.md](../README.md#-testing-with-real-attacks) |
+| Troubleshooting | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) |
+| Security hardening | [SECURITY.md](SECURITY.md) |

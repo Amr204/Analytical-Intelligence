@@ -1,254 +1,282 @@
-# 🛡️ Analytical-Intelligence v1 - نظام إدارة الأحداث الأمنية
+# 🛡️ Analytical-Intelligence v1 - Security Event Management System
 
-> نظام SIEM مصغر لكشف الهجمات في الوقت الحقيقي باستخدام تعلم الآلة
-
----
-
-## 📋 فهرس المحتويات
-
-1. [نظرة عامة](#-نظرة-عامة)
-2. [المتطلبات](#-المتطلبات)
-3. [تثبيت MobaXterm والاتصال بالخوادم](#-تثبيت-mobaxterm-والاتصال-بالخوادم)
-4. [تجهيز خادم التحليل (Analysis Server)](#-تجهيز-خادم-التحليل-analysis-server)
-5. [تجهيز خادم الاستشعار (Sensor Server)](#-تجهيز-خادم-الاستشعار-sensor-server)
-6. [اختبار النظام بهجمات حقيقية](#-اختبار-النظام-بهجمات-حقيقية)
-7. [التحقق من عمل النظام](#-التحقق-من-عمل-النظام)
-8. [سيناريوهات التشغيل](#-سيناريوهات-التشغيل)
-9. [الإعدادات المتقدمة](#-الإعدادات-المتقدمة)
-10. [حل المشاكل](#-حل-المشاكل)
+> A lightweight SIEM for real-time attack detection using Machine Learning
 
 ---
 
-## 📖 نظرة عامة
+## 📋 Table of Contents
 
-### ما هو Analytical-Intelligence؟
-
-نظام كشف التهديدات الأمنية في الوقت الحقيقي يستخدم:
-
-| المكون | الوظيفة | الدقة |
-|--------|---------|-------|
-| **SSH LSTM** | كشف هجمات Brute Force على SSH | عالية |
-| **Network RF** | تصنيف حركة الشبكة (Random Forest) | 96% F1-Score |
-
-### 🎯 أنواع الهجمات المكتشفة
-
-| نوع الهجوم | الوصف |
-|------------|-------|
-| **DoS** | Denial of Service - إغراق الخادم بطلبات |
-| **DDoS** | Distributed DoS - هجوم موزع |
-| **Port Scanning** | مسح المنافذ المفتوحة |
-| **Brute Force** | تخمين كلمات المرور |
-
-### 📚 التوثيق الكامل
-
-| الوثيقة | الوصف |
-|---------|-------|
-| [فهرس التوثيق](docs/INDEX.md) | خريطة سريعة لكل الوثائق |
-| [دليل التثبيت](docs/INSTALLATION.md) | تثبيت Analysis + Sensor |
-| [دليل التشغيل](docs/OPERATIONS.md) | تشغيل/إيقاف + إضافة sensors |
-| [استكشاف الأخطاء](docs/TROUBLESHOOTING.md) | حل المشاكل الشاملة |
-| [دليل التحديث](docs/UPGRADES.md) | تحديث النظام بأمان |
-| [بنية النظام](docs/ARCHITECTURE.md) | التصميم والتدفق |
-| [نماذج ML](docs/ML.md) | ضبط النماذج والعتبات |
-| [الأمان](docs/SECURITY.md) | جدار الحماية والتأمين |
+1. [Overview](#-overview)
+2. [Requirements](#-requirements)
+3. [Ubuntu Server Installation](#-ubuntu-server-installation)
+4. [MobaXterm Connection](#-mobaxterm-connection)
+5. [Analysis Server Setup](#-analysis-server-setup)
+6. [Sensor Server Setup](#-sensor-server-setup)
+7. [Testing with Real Attacks](#-testing-with-real-attacks)
+8. [Verification](#-verification)
+9. [Operation Scenarios](#-operation-scenarios)
+10. [Advanced Settings](#-advanced-settings)
+11. [Troubleshooting](#-troubleshooting)
 
 ---
 
+## 📖 Overview
 
-## 📦 المتطلبات
+### What is Analytical-Intelligence?
 
-### الأجهزة المطلوبة
+A real-time security threat detection system using:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    البيئة المطلوبة                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│   ┌───────────────┐    ┌───────────────┐   ┌───────────┐   │
-│   │ Analysis      │    │ Sensor        │   │ Attacker  │   │
-│   │ Server        │    │ Server        │   │ (Kali)    │   │
-│   │ Ubuntu 22.04  │    │ Ubuntu 22.04  │   │           │   │
-│   │ RAM: 4GB+     │    │ RAM: 2GB+     │   │           │   │
-│   └───────────────┘    └───────────────┘   └───────────┘   │
-│                                                             │
-│   جميعهم على نفس الشبكة (مثال: 192.168.1.0/24)             │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+| Component | Function | Accuracy |
+|-----------|----------|----------|
+| **SSH LSTM** | SSH Brute Force detection | High |
+| **Network RF** | Network traffic classification (Random Forest) | 96% F1-Score |
 
-### البرمجيات المطلوبة على جهازك (Windows)
+### 🎯 Detected Attack Types
 
-| البرنامج | الرابط |
-|----------|--------|
-| VMware Workstation | مُثبت مسبقاً |
-| MobaXterm | https://mobaxterm.mobatek.net/download.html |
+| Attack Type | Description |
+|-------------|-------------|
+| **DoS** | Denial of Service - flooding server with requests |
+| **DDoS** | Distributed DoS - distributed attack |
+| **Port Scanning** | Scanning open ports |
+| **Brute Force** | Password guessing |
+| **SSH Authentication** | SSH authentication attacks |
+
+### 📚 Full Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Documentation Index](docs/INDEX.md) | Quick navigation to all docs |
+| [Installation Guide](docs/INSTALLATION.md) | Analysis + Sensor setup |
+| [Operations Guide](docs/OPERATIONS.md) | Start/stop + add sensors |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Comprehensive problem-solving |
+| [Upgrades Guide](docs/UPGRADES.md) | Safe system updates |
+| [Architecture](docs/ARCHITECTURE.md) | Design and data flow |
+| [ML Models](docs/ML.md) | Model tuning and thresholds |
+| [Security](docs/SECURITY.md) | Firewall and hardening |
 
 ---
 
-## 🖥️ تثبيت MobaXterm والاتصال بالخوادم
+## 📦 Requirements
 
-### الخطوة 1: تحميل MobaXterm
+### Hardware Requirements
 
-1. افتح المتصفح وزر: https://mobaxterm.mobatek.net/download.html
-2. اختر **MobaXterm Home Edition (Installer edition)**
-3. حمّل الملف وشغّل التثبيت
-4. اضغط Next → Next → Install → Finish
+| Server | OS | RAM | CPU | Disk |
+|--------|-----|-----|-----|------|
+| **Analysis Server** | Ubuntu Server 22.04 | 4 GB | 4 cores | 40 GB |
+| **Sensor Server** | Ubuntu Server 22.04 | 4 GB | 4 cores | 40 GB |
 
-### الخطوة 2: معرفة IP الخوادم في VMware
+> **Note:** Both servers must be on the same network (e.g., `192.168.1.0/24`)
 
-**على كل خادم (Analysis و Sensor):**
+### Software Requirements (Windows)
 
-1. افتح VMware Workstation
-2. شغّل الخادم (Ubuntu)
-3. سجّل دخول بـ username و password
-4. نفّذ الأمر:
+| Software | Description | Link |
+|----------|-------------|------|
+| **VMware Workstation** | Run virtual machines | [Download VMware](https://www.vmware.com/products/workstation-pro/workstation-pro-evaluation.html) |
+| **MobaXterm** | SSH client for Windows | [Download MobaXterm](https://mobaxterm.mobatek.net/download.html) |
+| **Ubuntu Server 22.04** | Server operating system | [Download Ubuntu Server](https://ubuntu.com/download/server) |
+
+---
+
+## 💿 Ubuntu Server Installation
+
+### Installation Steps in VMware
+
+1. **Create a new virtual machine** in VMware:
+   - Memory: **4 GB**
+   - Processors: **4 cores**
+   - Hard Disk: **40 GB**
+
+2. **Set names during installation:**
+
+**For Analyzer (Analysis Server):**
+
+| Field | Value |
+|-------|-------|
+| Your name | `analyzer` |
+| Your server's name | `ubuntu-analyzer` |
+| Pick a username | `analyzer` |
+| Choose a password | `analyzer` |
+
+**For Sensor (Sensor Server):**
+
+| Field | Value |
+|-------|-------|
+| Your name | `server` |
+| Your server's name | `ubuntu-server` |
+| Pick a username | `server` |
+| Choose a password | `server` |
+
+3. **Enable OpenSSH** during installation ✓
+4. **Complete installation and restart**
+
+---
+
+## 🖥️ MobaXterm Connection
+
+### Step 1: Download MobaXterm
+
+1. Open browser and visit: https://mobaxterm.mobatek.net/download.html
+2. Choose **MobaXterm Home Edition (Installer edition)**
+3. Download and run the installer
+4. Click Next → Next → Install → Finish
+
+### Step 2: Find Server IPs
+
+**On each server:**
 
 ```bash
 ip addr show
 ```
 
-**ابحث عن سطر يحتوي على `inet` تحت `ens33` أو `eth0`:**
+**Record the IPs:**
 
-```
-2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP>
-    inet 192.168.1.20/24 brd 192.168.1.255 scope global ens33
-         ↑
-    هذا هو الـ IP (سجّله!)
-```
+| Server | Hostname | IP (example) |
+|--------|----------|--------------|
+| Analyzer | ubuntu-analyzer | 192.168.1.20 |
+| Sensor | ubuntu-server | 192.168.1.21 |
 
-**سجّل الـ IPs:**
+### Step 3: Connect to Servers
+
+1. **Open MobaXterm**
+2. Click **Session** → **SSH**
+
+**Analyzer connection settings:**
 ```
-╔═══════════════════════════════════════════════╗
-║  سجّل هذه المعلومات - ستحتاجها!              ║
-╠═══════════════════════════════════════════════╣
-║                                               ║
-║  Analysis Server IP: _________________        ║
-║  (مثال: 192.168.1.20)                         ║
-║                                               ║
-║  Sensor Server IP:   _________________        ║
-║  (مثال: 192.168.1.21)                         ║
-║                                               ║
-║  Attacker (Kali) IP: _________________        ║
-║  (مثال: 192.168.1.100)                        ║
-║                                               ║
-╚═══════════════════════════════════════════════╝
+Remote host: 192.168.1.20
+Username:    analyzer
+Port:        22
+Password:    analyzer
 ```
 
-### الخطوة 3: الاتصال بالخوادم عبر MobaXterm
+**Sensor connection settings:**
+```
+Remote host: 192.168.1.21
+Username:    server
+Port:        22
+Password:    server
+```
 
-1. **افتح MobaXterm**
+**Expected result:**
 
-2. **إنشاء اتصال جديد:**
-   - اضغط على **Session** (أعلى يسار)
-   - اختر **SSH**
-
-3. **إعدادات الاتصال:**
-   ```
-   Remote host: 192.168.1.20     ← (IP خادم التحليل)
-   Username:    your_username     ← (اسم المستخدم)
-   Port:        22
-   ```
-
-4. اضغط **OK**
-
-5. عند السؤال عن كلمة المرور:
-   ```
-   Password: ********     ← (اكتب كلمة المرور واضغط Enter)
-   ```
-
-6. **كرر الخطوات للخوادم الأخرى:**
-   - أنشئ اتصال لـ Sensor Server (192.168.1.21)
-   - أنشئ اتصال لـ Kali Attacker (192.168.1.100)
-
-**النتيجة المتوقعة:**
-
-الآن يجب أن يكون لديك 3 تبويبات (tabs) في MobaXterm:
-- Analysis Server
-- Sensor Server
-- Kali (Attacker)
+Two tabs in MobaXterm:
+- ubuntu-analyzer (Analysis Server)
+- ubuntu-server (Sensor Server)
 
 ---
 
-## 📊 تجهيز خادم التحليل (Analysis Server)
+## 📊 Analysis Server Setup
 
-> **افتح تبويب Analysis Server في MobaXterm**
+> **Open ubuntu-analyzer tab in MobaXterm**
 
-### الخطوة 1: تحديث النظام
+### Step 0: Disk Expansion (Required!)
+
+> ⚠️ **This step is required** to use full disk space (40 GB)
 
 ```bash
-# تحديث قائمة الحزم
+# Show partitions
+lsblk
+
+# Check current space
+df -h /
+
+# Expand partition
+sudo growpart /dev/sda 3
+
+# Expand Physical Volume
+sudo pvresize /dev/sda3
+
+# Expand Logical Volume
+sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv
+
+# Expand filesystem
+sudo resize2fs /dev/ubuntu-vg/ubuntu-lv
+
+# Verify expansion
+df -h /
+```
+
+**Expected result:**
+```
+Filesystem                         Size  Used Avail Use% Mounted on
+/dev/mapper/ubuntu--vg-ubuntu--lv   39G  3.5G   34G   9% /
+```
+
+### Step 1: Update System
+
+```bash
+# Update package list
 sudo apt update
 
-# ترقية الحزم المثبتة
+# Upgrade installed packages
 sudo apt upgrade -y
 ```
 
-**انتظر حتى ينتهي (قد يأخذ 2-5 دقائق)**
+**Wait until complete (may take 2-5 minutes)**
 
-### الخطوة 2: تثبيت Docker
+### Step 2: Install Docker
 
 ```bash
-# تحميل وتثبيت Docker
+# Download and install Docker
 curl -fsSL https://get.docker.com | sudo sh
 ```
 
-**انتظر حتى ينتهي (قد يأخذ 1-3 دقائق)**
+**Wait until complete (may take 1-3 minutes)**
 
 ```bash
-# إضافة المستخدم لمجموعة Docker
+# Add user to Docker group
 sudo usermod -aG docker $USER
 ```
 
-### الخطوة 3: تفعيل الصلاحيات (مهم جداً!)
+### Step 3: Activate Permissions (Important!)
 
 ```bash
-# تسجيل خروج ودخول لتفعيل الصلاحيات
+# Log out and back in to activate permissions
 exit
 ```
 
-**الآن في MobaXterm:**
-- أعد الاتصال بالخادم (اضغط على التبويب مرة أخرى)
-- أو اضغط زر **Reconnect**
+**Now in MobaXterm:**
+- Reconnect to the server (click on the tab again)
+- Or click **Reconnect** button
 
-### الخطوة 4: التحقق من Docker
+### Step 4: Verify Docker
 
 ```bash
-# تحقق من إصدار Docker
+# Check Docker version
 docker --version
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```
 Docker version 24.0.7, build afdd53b
 ```
 
 ```bash
-# تحقق من Docker Compose
+# Check Docker Compose
 docker compose version
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```
 Docker Compose version v2.21.0
 ```
 
-### الخطوة 5: تحميل المشروع
+### Step 5: Clone Repository
 
 ```bash
-# الانتقال للمجلد الرئيسي
+# Go to home directory
 cd ~
 
-# تحميل المشروع من GitHub
+# Clone project from GitHub
 git clone https://github.com/Amr204/Analytical-Intelligence.git
 
-# الدخول لمجلد المشروع
+# Enter project folder
 cd Analytical-Intelligence
 
-# التحقق من الملفات
+# Verify files
 ls -la
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```
 drwxrwxr-x  8 user user 4096 Jan 16 10:00 .
 drwxr-xr-x 15 user user 4096 Jan 16 10:00 ..
@@ -260,67 +288,67 @@ drwxrwxr-x  3 user user 4096 Jan 16 10:00 services
 ...
 ```
 
-### الخطوة 6: التحقق من النماذج
+### Step 6: Verify Models
 
 ```bash
-# التحقق من وجود SSH model
+# Check SSH model
 ls -la models/ssh/
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```
 -rw-rw-r-- 1 user user XXXXX Jan 16 10:00 ssh_lstm.joblib
 ```
 
 ```bash
-# التحقق من وجود Network RF model
+# Check Network RF model
 ls -la models/RF/
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```
 -rw-rw-r-- 1 user user XXXXX Jan 16 10:00 random_forest.joblib
 -rw-rw-r-- 1 user user XXXXX Jan 16 10:00 feature_list.json
 -rw-rw-r-- 1 user user XXXXX Jan 16 10:00 label_map.json
 ```
 
-### الخطوة 7: إعداد ملف البيئة
+### Step 7: Configure Environment
 
 ```bash
-# نسخ ملف البيئة النموذجي
+# Copy example environment file
 cp .env.example .env
 
-# فتح الملف للتعديل
+# Open file for editing
 nano .env
 ```
 
-**محتوى الملف (غيّر API Key للأمان):**
+**File contents (change API Key for security):**
 
 ```bash
-# مفتاح API - غيّره في الإنتاج!
+# API Key - change in production!
 INGEST_API_KEY=MySecureKey12345
 
-# قاعدة البيانات
+# Database
 POSTGRES_USER=ai
 POSTGRES_PASSWORD=ai2025
 POSTGRES_DB=ai_db
 ```
 
-**للحفظ والخروج من nano:**
-1. اضغط `Ctrl + X`
-2. اضغط `Y`
-3. اضغط `Enter`
+**To save and exit nano:**
+1. Press `Ctrl + X`
+2. Press `Y`
+3. Press `Enter`
 
-### الخطوة 8: تشغيل النظام
+### Step 8: Start System
 
 ```bash
-# تشغيل Analysis Stack (يفعّل BuildKit تلقائياً)
+# Start Analysis Stack (enables BuildKit automatically)
 bash scripts/analysis_up.sh
 ```
 
-**انتظر! هذه الخطوة تأخذ وقت (5-10 دقائق في أول مرة)**
+**Wait! This step takes time (5-10 minutes on first run)**
 
-**سترى شيء مثل:**
+**You will see something like:**
 ```
 ==============================================
 Analytical-Intelligence Analysis Stack Startup
@@ -343,45 +371,45 @@ Dashboard: http://localhost:8000
 ```
 
 <details>
-<summary>📌 تشغيل يدوي (للمتقدمين)</summary>
+<summary>📌 Manual startup (for advanced users)</summary>
 
 ```bash
-# تفعيل BuildKit يدوياً
+# Enable BuildKit manually
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
-# بناء وتشغيل
+# Build and start
 docker compose -f docker-compose.analysis.yml up -d --build
 
-# مراقبة السجلات
+# Watch logs
 docker compose -f docker-compose.analysis.yml logs -f backend
 ```
 </details>
 
-### الخطوة 9: التحقق من التشغيل
+### Step 9: Verify Startup
 
 ```bash
-# تحقق من حالة الحاويات
+# Check container status
 docker ps
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```
 CONTAINER ID   IMAGE              COMMAND                  STATUS          PORTS                    NAMES
 xxx            ai_db-backend     "uvicorn app.main:…"     Up 25 seconds   0.0.0.0:8000->8000/tcp   ai_db-backend
 xxx            postgres:15       "docker-entrypoint.…"    Up 30 seconds   5432/tcp                 ai_db-postgres
 ```
 
-**مهم:** يجب أن يكون STATUS = "Up" للحاويتين!
+**Important:** STATUS must be "Up" for both containers!
 
-### الخطوة 10: فحص صحة الـ API
+### Step 10: Check API Health
 
 ```bash
-# فحص الـ Health endpoint
+# Check Health endpoint
 curl -s http://localhost:8000/api/v1/health | jq
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```json
 {
   "status": "ok",
@@ -390,66 +418,66 @@ curl -s http://localhost:8000/api/v1/health | jq
 }
 ```
 
-**إذا لم يكن `jq` مثبتاً:**
+**If `jq` is not installed:**
 ```bash
 sudo apt install -y jq
 ```
 
-### الخطوة 12: فتح الواجهة في المتصفح
+### Step 11: Open Dashboard in Browser
 
-**على جهازك Windows:**
+**On your Windows machine:**
 
-1. افتح المتصفح (Chrome/Firefox/Edge)
-2. اكتب في شريط العناوين:
+1. Open browser (Chrome/Firefox/Edge)
+2. Enter in address bar:
    ```
    http://192.168.1.20:8000
    ```
-   (استبدل بـ IP خادم التحليل الخاص بك)
+   (Replace with your Analysis server IP)
 
-**النتيجة المتوقعة:**
-- صفحة Dashboard تظهر
-- تعرض إحصائيات (قد تكون صفر في البداية)
+**Expected result:**
+- Dashboard page appears
+- Shows statistics (may be zero initially)
 
-### الخطوة 13: فتح جدار الحماية (إذا لم تفتح الواجهة)
+### Step 12: Open Firewall (if dashboard doesn't open)
 
 ```bash
-# السماح بـ SSH أولاً (مهم!)
+# Allow SSH first (important!)
 sudo ufw allow 22/tcp
 ```
 
-**⚠️ إعداد أمني موصى به (قيود على port 8000):**
+**⚠️ Recommended security setup (port 8000 restrictions):**
 
 ```bash
-# السماح فقط لـ Sensor بالوصول للـ API
+# Allow only Sensor to access API
 sudo ufw allow from <SENSOR_IP> to any port 8000 proto tcp
 
-# السماح لجهاز Windows للوصول للواجهة
+# Allow Windows machine to access dashboard
 sudo ufw allow from <YOUR_WINDOWS_IP> to any port 8000 proto tcp
 
-# رفض أي جهاز آخر من الوصول لـ 8000
+# Deny others from accessing 8000
 sudo ufw deny 8000/tcp
 
-# تفعيل UFW
+# Enable UFW
 sudo ufw enable
 
-# التحقق من القواعد
+# Verify rules
 sudo ufw status numbered
 ```
 
-**مثال واقعي:**
+**Real example:**
 ```bash
-# السماح للـ Sensor بـ IP 192.168.1.21
+# Allow Sensor with IP 192.168.1.21
 sudo ufw allow from 192.168.1.21 to any port 8000 proto tcp
 
-# السماح لجهاز Windows بـ IP 192.168.1.100
+# Allow Windows machine with IP 192.168.1.100
 sudo ufw allow from 192.168.1.100 to any port 8000 proto tcp
 
-# رفض البقية
+# Deny others
 sudo ufw deny 8000/tcp
 sudo ufw enable
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```
 Status: active
 
@@ -461,52 +489,52 @@ Status: active
 [ 4] 8000/tcp                   DENY IN     Anywhere
 ```
 
-**🔓 إعداد بسيط (للتجربة فقط):**
+**🔓 Simple setup (for testing only):**
 ```bash
-# فتح 8000 لأي جهاز (غير آمن في الإنتاج!)
+# Open 8000 for any device (not secure in production!)
 sudo ufw allow 8000
 sudo ufw enable
 ```
 
 ---
 
-## 🔍 تجهيز خادم الاستشعار (Sensor Server)
+## 🔍 Sensor Server Setup
 
-> **افتح تبويب Sensor Server في MobaXterm**
+> **Open Sensor Server tab in MobaXterm**
 
-### الخطوة 1: تحديث وتثبيت Docker
+### Step 1: Update and Install Docker
 
 ```bash
-# تحديث النظام
+# Update system
 sudo apt update && sudo apt upgrade -y
 
-# تثبيت Docker
+# Install Docker
 curl -fsSL https://get.docker.com | sudo sh
 
-# إضافة المستخدم لمجموعة Docker
+# Add user to Docker group
 sudo usermod -aG docker $USER
 
-# تسجيل خروج لتفعيل الصلاحيات
+# Log out to activate permissions
 exit
 ```
 
-**أعد الاتصال بالخادم في MobaXterm**
+**Reconnect to server in MobaXterm**
 
-### الخطوة 2: التحقق من Docker
+### Step 2: Verify Docker
 
 ```bash
 docker --version
 docker compose version
 ```
 
-### الخطوة 3: اختبار الاتصال بخادم التحليل
+### Step 3: Test Connection to Analysis Server
 
 ```bash
-# اختبار ping (استبدل بـ IP خادم التحليل)
+# Test ping (replace with Analysis server IP)
 ping -c 4 192.168.1.20
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```
 PING 192.168.1.20 (192.168.1.20) 56(84) bytes of data.
 64 bytes from 192.168.1.20: icmp_seq=1 ttl=64 time=0.345 ms
@@ -515,21 +543,21 @@ PING 192.168.1.20 (192.168.1.20) 56(84) bytes of data.
 ```
 
 ```bash
-# اختبار الـ API
+# Test API
 curl -s http://192.168.1.20:8000/api/v1/health
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```json
 {"status":"ok","timestamp":"...","version":"1.0.0"}
 ```
 
-**إذا فشل الاتصال:**
-- تأكد من أن Analysis Server يعمل
-- تأكد من جدار الحماية (ufw allow 8000)
-- تأكد من أن الخادمين على نفس الشبكة
+**If connection fails:**
+- Make sure Analysis Server is running
+- Check firewall (ufw allow 8000)
+- Make sure both servers are on the same network
 
-### الخطوة 4: تحميل المشروع
+### Step 4: Clone Repository
 
 ```bash
 cd ~
@@ -537,138 +565,138 @@ git clone https://github.com/Amr204/Analytical-Intelligence.git
 cd Analytical-Intelligence
 ```
 
-### الخطوة 5: معرفة اسم واجهة الشبكة
+### Step 5: Find Network Interface Name
 
 ```bash
-# عرض واجهات الشبكة
+# Show network interfaces
 ip link show
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```
 1: lo: <LOOPBACK,UP,LOWER_UP> ...
-2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> ...  ← هذه
+2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> ...  ← this one
 ```
 
-**سجّل اسم الواجهة (عادة: ens33 أو eth0 أو enp0s3)**
+**Note the interface name (usually: ens33, eth0, or enp0s3)**
 
-### الخطوة 6: إعداد ملف البيئة
+### Step 6: Configure Environment
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-**عدّل المتغيرات التالية:**
+**Edit these variables:**
 
 ```bash
-# عنوان خادم التحليل (غيّره!)
+# Analysis server address (change it!)
 ANALYZER_HOST=192.168.1.20
 
-# مفتاح API (نفس المفتاح في Analysis!)
+# API key (same key as Analysis!)
 INGEST_API_KEY=MySecureKey12345
 
-# واجهة الشبكة (غيّرها حسب جهازك!)
+# Network interface (change as needed!)
 NET_IFACE=ens33
 
-# معرف الجهاز
+# Device ID
 DEVICE_ID=sensor-01
 HOSTNAME=sensor-server
 ```
 
-**للحفظ:** `Ctrl + X` → `Y` → `Enter`
+**To save:** `Ctrl + X` → `Y` → `Enter`
 
-### الخطوة 7: تشغيل Sensor Stack
+### Step 7: Start Sensor Stack
 
 ```bash
-# تشغيل Sensor Stack (يفعّل BuildKit تلقائياً)
+# Start Sensor Stack (enables BuildKit automatically)
 bash scripts/sensor_up.sh
 ```
 
-**انتظر (3-5 دقائق في أول مرة)**
+**Wait (3-5 minutes on first run)**
 
 <details>
-<summary>📌 تشغيل يدوي (للمتقدمين)</summary>
+<summary>📌 Manual startup (for advanced users)</summary>
 
 ```bash
-# تفعيل BuildKit يدوياً
+# Enable BuildKit manually
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
-# بناء وتشغيل
+# Build and start
 docker compose -f docker-compose.sensor.yml up -d --build
 
-# مراقبة السجلات
+# Watch logs
 docker compose -f docker-compose.sensor.yml logs -f
 ```
 </details>
 
-### الخطوة 8: التحقق من التشغيل
+### Step 8: Verify Startup
 
 ```bash
 docker ps
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```
 CONTAINER ID   IMAGE                     STATUS         NAMES
 xxx            ai_db-auth-collector     Up 1 minute    ai_db-auth-collector
 xxx            ai_db-flow-collector     Up 1 minute    ai_db-flow-collector
 ```
 
-### الخطوة 9: مراقبة السجلات
+### Step 9: Watch Logs
 
 ```bash
-# مراقبة السجلات مباشرة
+# Watch logs directly
 docker compose -f docker-compose.sensor.yml logs -f
 ```
 
-**اضغط `Ctrl + C` للخروج**
+**Press `Ctrl + C` to exit**
 
 ---
 
-## ⚔️ اختبار النظام بهجمات حقيقية
+## ⚔️ Testing with Real Attacks
 
-> **افتح تبويب Kali (Attacker) في MobaXterm**
+> **Open Kali (Attacker) tab in MobaXterm**
 
-### 🎯 الهجوم 1: SSH Brute Force
+### 🎯 Attack 1: SSH Brute Force
 
-**الهدف:** اختبار كشف هجمات تخمين كلمات المرور على SSH
+**Goal:** Test SSH password guessing attack detection
 
 ```bash
-# تثبيت hydra إذا لم يكن موجوداً
+# Install hydra if not present
 sudo apt install -y hydra
 
-# إنشاء ملف كلمات مرور للاختبار
+# Create test password file
 echo -e "admin\n123456\npassword\nroot\ntest\nuser\nletmein\nqwerty" > passwords.txt
 
-# تنفيذ هجوم Brute Force على Sensor Server
+# Execute Brute Force attack on Sensor Server
 hydra -l root -P passwords.txt ssh://192.168.1.21 -t 4 -V
 ```
 
-**استبدل `192.168.1.21` بـ IP خادم الاستشعار**
+**Replace `192.168.1.21` with Sensor server IP**
 
-**ماذا سترى:**
+**You will see:**
 ```
 [DATA] attacking ssh://192.168.1.21:22/
-[22][ssh] host: 192.168.1.21   login: root   password: (فشل)
-[22][ssh] host: 192.168.1.21   login: root   password: (فشل)
+[22][ssh] host: 192.168.1.21   login: root   password: (failed)
+[22][ssh] host: 192.168.1.21   login: root   password: (failed)
 ...
 ```
 
-### 🎯 الهجوم 2: Port Scanning (Nmap)
+### 🎯 Attack 2: Port Scanning (Nmap)
 
-**الهدف:** اختبار كشف مسح المنافذ
+**Goal:** Test port scanning detection
 
 ```bash
-# مسح سريع للمنافذ الشائعة
+# Quick scan of common ports
 nmap -sS -F 192.168.1.21
 
-# مسح شامل لكل المنافذ
+# Full port scan
 nmap -sS -p- 192.168.1.21 --min-rate 1000
 ```
 
-**ماذا سترى:**
+**You will see:**
 ```
 Starting Nmap
 PORT     STATE SERVICE
@@ -677,65 +705,65 @@ PORT     STATE SERVICE
 ...
 ```
 
-### 🎯 الهجوم 3: SYN Flood (DoS)
+### 🎯 Attack 3: SYN Flood (DoS)
 
-**الهدف:** اختبار كشف هجمات DoS
+**Goal:** Test DoS attack detection
 
 ```bash
-# تثبيت hping3
+# Install hping3
 sudo apt install -y hping3
 
-# هجوم SYN Flood على المنفذ 80
+# SYN Flood attack on port 80
 sudo hping3 -S --flood -V -p 80 192.168.1.21
 ```
 
-**اضغط `Ctrl + C` بعد 10 ثواني لإيقاف الهجوم**
+**Press `Ctrl + C` after 10 seconds to stop the attack**
 
-### 🎯 الهجوم 4: محاكاة تسجيل دخول SSH فاشل
+### 🎯 Attack 4: Simulating Failed SSH Logins
 
 ```bash
-# محاولات تسجيل دخول فاشلة متكررة
+# Repeated failed login attempts
 for i in {1..10}; do
     ssh -o StrictHostKeyChecking=no -o ConnectTimeout=2 wronguser@192.168.1.21
     echo "Attempt $i"
 done
 ```
 
-**كل محاولة ستفشل وتُسجّل في النظام**
+**Each attempt will fail and be logged in the system**
 
 ---
 
-## ✅ التحقق من عمل النظام
+## ✅ Verification
 
-### 1. التحقق من Dashboard
+### 1. Check Dashboard
 
-**في المتصفح:**
+**In browser:**
 ```
 http://192.168.1.20:8000
 ```
 
-**يجب أن ترى:**
-- عدد الأحداث (Events) يزداد
-- تنبيهات جديدة تظهر
-- الرسم البياني يتحدث
+**You should see:**
+- Event count increasing
+- New alerts appearing
+- Graph updating
 
-### 2. التحقق من صفحة Alerts
+### 2. Check Alerts Page
 
-**في المتصفح:**
+**In browser:**
 ```
 http://192.168.1.20:8000/alerts
 ```
 
-**يجب أن ترى:**
-- تنبيهات بألوان مختلفة (حسب الخطورة)
-- أنواع مختلفة: Port Scanning, Brute Force, DoS
+**You should see:**
+- Alerts with different colors (by severity)
+- Different types: Port Scanning, Brute Force, DoS
 
-### 3. التحقق من API
+### 3. Check API
 
-**على خادم التحليل:**
+**On Analysis server:**
 
 ```bash
-# عدد الأحداث في قاعدة البيانات
+# Event count in database
 docker exec -it ai_db-postgres psql -U ai -d ai_db -c "
 SELECT event_type, COUNT(*) as count 
 FROM raw_events 
@@ -743,7 +771,7 @@ GROUP BY event_type;
 "
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```
  event_type | count
 ------------+-------
@@ -752,7 +780,7 @@ GROUP BY event_type;
 ```
 
 ```bash
-# عدد التنبيهات حسب النوع
+# Alert count by type
 docker exec -it ai_db-postgres psql -U ai -d ai_db -c "
 SELECT model_name, label, severity, COUNT(*) as count
 FROM detections 
@@ -761,7 +789,7 @@ ORDER BY count DESC;
 "
 ```
 
-**النتيجة المتوقعة:**
+**Expected result:**
 ```
  model_name | label          | severity | count
 ------------+----------------+----------+-------
@@ -770,15 +798,15 @@ ORDER BY count DESC;
  ssh_lstm   | Brute Force    | CRITICAL |     5
 ```
 
-### 4. مراقبة السجلات مباشرة
+### 4. Watch Logs Directly
 
-**على خادم التحليل:**
+**On Analysis server:**
 ```bash
-# مراقبة سجلات Backend مباشرة
+# Watch Backend logs directly
 docker logs -f ai_db-backend
 ```
 
-**سترى رسائل مثل:**
+**You will see messages like:**
 ```
 INFO:     Network RF detection: DoS (HIGH)
 INFO:     Network RF detection DEDUP: DoS (x3)
@@ -787,59 +815,59 @@ INFO:     SSH detection: Brute Force attempt detected
 
 ---
 
-## 🔄 سيناريوهات التشغيل
+## 🔄 Operation Scenarios
 
-### السيناريو 1: تشغيل النظام بعد إعادة تشغيل الخادم
+### Scenario 1: Start System After Server Restart
 
-**على خادم التحليل:**
+**On Analysis server:**
 ```bash
 cd ~/Analytical-Intelligence
 docker compose -f docker-compose.analysis.yml up -d
 ```
 
-**على خادم الاستشعار:**
+**On Sensor server:**
 ```bash
 cd ~/Analytical-Intelligence
 docker compose -f docker-compose.sensor.yml up -d
 ```
 
-### السيناريو 2: تحديث الكود بعد git pull
+### Scenario 2: Update Code After git pull
 
 ```bash
 cd ~/Analytical-Intelligence
 git pull
 
-# إعادة البناء (سريع بفضل cache)
+# Rebuild (fast thanks to cache)
 docker compose -f docker-compose.analysis.yml up -d --build
 ```
 
-### السيناريو 3: إيقاف النظام
+### Scenario 3: Stop System
 
-**على خادم التحليل:**
+**On Analysis server:**
 ```bash
 docker compose -f docker-compose.analysis.yml down
 ```
 
-**على خادم الاستشعار:**
+**On Sensor server:**
 ```bash
 docker compose -f docker-compose.sensor.yml down
 ```
 
-### السيناريو 4: إعادة تعيين كاملة (حذف كل البيانات)
+### Scenario 4: Full Reset (Delete All Data)
 
 ```bash
-# ⚠️ يحذف كل البيانات!
+# ⚠️ Deletes all data!
 docker compose -f docker-compose.analysis.yml down -v
 docker compose -f docker-compose.analysis.yml up -d --build
 ```
 
 ---
 
-## 📡 إعداد متعدد الأجهزة (Multi-Device Setup)
+## 📡 Multi-Device Setup
 
-### كيف يعمل النظام مع عدة Sensors؟
+### How Does the System Work with Multiple Sensors?
 
-النظام يدعم عدة أجهزة استشعار (Sensors) ترسل البيانات لخادم تحليل واحد:
+The system supports multiple sensors sending data to one analysis server:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -853,122 +881,121 @@ docker compose -f docker-compose.analysis.yml up -d --build
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### خطوات إضافة Sensor جديد
+### Steps to Add New Sensor
 
-**على الـ Sensor الجديد:**
+**On the new Sensor:**
 
 ```bash
-# 1. تحميل المشروع
+# 1. Clone repository
 git clone https://github.com/Amr204/Analytical-Intelligence.git
 cd Analytical-Intelligence
 
-# 2. إنشاء .env مع DEVICE_ID فريد!
+# 2. Create .env with unique DEVICE_ID!
 cp .env.example .env
 nano .env
 ```
 
-**محتوى .env (مهم!):**
+**.env contents (important!):**
 ```bash
-ANALYZER_HOST=192.168.1.20        # IP خادم التحليل
-INGEST_API_KEY=MySecureKey12345   # نفس المفتاح في Analysis!
+ANALYZER_HOST=192.168.1.20        # Analysis server IP
+INGEST_API_KEY=MySecureKey12345   # Same key as Analysis!
 
-# ⚠️ مهم جداً: DEVICE_ID يجب أن يكون فريد لكل Sensor!
-DEVICE_ID=sensor-datacenter-02    # فريد!
+# ⚠️ DEVICE_ID must be unique for each Sensor!
+DEVICE_ID=sensor-datacenter-02    # Unique!
 HOSTNAME=datacenter-sensor-02
 NET_IFACE=ens33
 ```
 
 ```bash
-# 3. تشغيل الـ Sensor
+# 3. Start Sensor
 bash scripts/sensor_up.sh
 ```
 
-### عرض الأجهزة في الواجهة
+### View Devices in Dashboard
 
-**في المتصفح:**
+**In browser:**
 ```
 http://<ANALYZER_IP>:8000/devices
 ```
 
-**سترى:**
-- قائمة بطاقات (Cards) لكل جهاز
-- حالة Online/Offline لكل جهاز
-- عدد التنبيهات في آخر 24 ساعة
-- زر "View Details" لعرض تفاصيل الجهاز
+**You will see:**
+- Device cards for each sensor
+- Online/Offline status for each device
+- Alert count in last 24 hours
+- "View Details" button for device details
 
-### تصفية التنبيهات حسب الجهاز
+### Filter Alerts by Device
 
-**في صفحة Alerts:**
+**On Alerts page:**
 ```
 http://<ANALYZER_IP>:8000/alerts?device_id=sensor-01
 ```
 
-أو استخدم dropdown "Device" في فلاتر الصفحة.
+Or use the "Device" dropdown in page filters.
 
 ---
 
-## ⚙️ الإعدادات المتقدمة
+## ⚙️ Advanced Settings
 
-### تخصيص الهجمات المكتشفة (Allowlist)
+### Customize Detected Attacks (Allowlist)
 
-النظام يخزن فقط هذه الهجمات افتراضياً:
+The system stores only these attacks by default:
 - DoS
 - DDoS
 - Port Scanning
 - Brute Force
 
-**لتغيير القائمة (في .env على Analysis Server):**
+**To change the list (in .env on Analysis Server):**
 ```bash
-# إضافة Bots و Web Attacks:
+# Add Bots and Web Attacks:
 NETWORK_LABEL_ALLOWLIST=DoS,DDoS,Port Scanning,Brute Force,Bots,Web Attacks
 
-# أو تقليل القائمة:
+# Or reduce the list:
 NETWORK_LABEL_ALLOWLIST=DDoS,DoS
 ```
 
-### تعديل حساسية الكشف
+### Adjust Detection Sensitivity
 
 ```bash
-# عتبة الثقة للـ Network ML (افتراضي: 0.60)
+# Network ML confidence threshold (default: 0.60)
 NETWORK_ML_THRESHOLD=0.60
 
-# عدد المحاولات الفاشلة لإطلاق تنبيه SSH
+# Failed attempts to trigger SSH alert
 SSH_BRUTEFORCE_THRESHOLD=5
 
-# النافذة الزمنية لتجميع المحاولات (ثانية)
+# Time window for aggregating attempts (seconds)
 SSH_BRUTEFORCE_WINDOW_SECONDS=300
 ```
 
 ---
 
-## 🔧 حل المشاكل
+## 🔧 Troubleshooting
 
-للحصول على دليل شامل لحل المشاكل، راجع:
+For comprehensive troubleshooting guide, see:
 
-📖 **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - دليل استكشاف الأخطاء الكامل
+📖 **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Full troubleshooting guide
 
-يشمل:
-- استعادة النظام بعد إعادة التشغيل
-- مشاكل تغيير عناوين IP
-- مشاكل Docker والبناء
-- مشاكل نماذج ML
-- مشاكل قاعدة البيانات
-- مشاكل الشبكة والجدار الناري
+Includes:
+- System recovery after restart
+- IP address change issues
+- Docker and build issues
+- ML model issues
+- Database issues
+- Network and firewall issues
 
-### مشاكل سريعة
+### Quick Fixes
 
-| المشكلة | الحل السريع |
-|---------|-------------|
-| الواجهة لا تفتح | `sudo ufw allow 8000` |
-| Sensor لا يتصل | تحقق من `ANALYZER_HOST` في `.env` |
-| لا توجد تنبيهات | خفض `NETWORK_ML_THRESHOLD=0.50` |
-| Container لا يبدأ | `docker compose logs backend` |
-| DNS يفشل أثناء البناء | `bash scripts/docker_doctor.sh` |
+| Problem | Quick Fix |
+|---------|-----------|
+| Dashboard doesn't open | `sudo ufw allow 8000` |
+| Sensor doesn't connect | Check `ANALYZER_HOST` in `.env` |
+| No alerts | Lower `NETWORK_ML_THRESHOLD=0.50` |
+| Container doesn't start | `docker compose logs backend` |
+| DNS fails during build | `bash scripts/docker_doctor.sh` |
 
 ---
 
-
-## 📊 ملخص النظام
+## 📊 System Summary
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -995,6 +1022,6 @@ SSH_BRUTEFORCE_WINDOW_SECONDS=300
 
 ---
 
-## 📄 الترخيص
+## 📄 License
 
-MIT License - استخدم كما تشاء مع الإشارة للمصدر.
+MIT License - Use freely with attribution.

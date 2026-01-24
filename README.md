@@ -92,18 +92,18 @@ A real-time security threat detection system using:
 
 | Field | Value |
 |-------|-------|
-| Your name | `analyzer` |
+| Your name | `ubuntu-analyze` |
 | Your server's name | `ubuntu-analyzer` |
-| Pick a username | `analyzer` |
+| Pick a username | `ubuntu-analyze` |
 | Choose a password | `analyzer` |
 
 **For Sensor (Sensor Server):**
 
 | Field | Value |
 |-------|-------|
-| Your name | `server` |
+| Your name | `ubuntu-server` |
 | Your server's name | `ubuntu-server` |
-| Pick a username | `server` |
+| Pick a username | `ubuntu-server` |
 | Choose a password | `server` |
 
 3. **Enable OpenSSH** during installation ✓

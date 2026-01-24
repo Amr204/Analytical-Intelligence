@@ -46,6 +46,29 @@ async def lifespan(app: FastAPI):
     if not ssh_loaded and not network_loaded:
         logger.warning("No ML models loaded - detection capabilities limited")
     
+    # Initialize NotificationBus
+    from app.notifications import NotificationBus, set_notification_bus
+    notification_bus = NotificationBus()
+    notification_bus.start()
+    set_notification_bus(notification_bus)
+    app.state.notification_bus = notification_bus
+    
+    # Telegram startup test (optional)
+    if settings.telegram_enabled and settings.telegram_startup_test:
+        from datetime import datetime as dt
+        from app.notifications.telegram import TelegramNotifier
+        try:
+            notifier = TelegramNotifier()
+            await notifier.send_message(
+                "✅ <b>Analytical-Intelligence</b> started\n"
+                f"🕒 {dt.utcnow().isoformat()}Z\n"
+                "📡 Telegram alerts active"
+            )
+            await notifier.close()
+            logger.info("Telegram startup test message sent")
+        except Exception as e:
+            logger.warning(f"Telegram startup test failed: {e}")
+    
     logger.info(f"Backend running on {settings.backend_host}:{settings.backend_port}")
     logger.info("=" * 50)
     
@@ -53,6 +76,11 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Analytical-Intelligence v1 Shutting down...")
+    
+    # Stop NotificationBus
+    if hasattr(app.state, 'notification_bus') and app.state.notification_bus:
+        await app.state.notification_bus.stop()
+        set_notification_bus(None)
 
 
 # Create FastAPI app

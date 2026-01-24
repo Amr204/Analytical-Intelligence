@@ -424,12 +424,12 @@ async def get_stats(session: AsyncSession) -> dict:
 
 
 async def get_recent_detections(session: AsyncSession, limit: int = 20) -> List[dict]:
-    """Get recent detections."""
+    """Get recent detections, ordered by most recent activity (last_seen or ts)."""
     result = await session.execute(
         text("""
-            SELECT id, ts, device_id, model_name, label, score, severity, details
+            SELECT id, ts, device_id, model_name, label, score, severity, details, occurrences, last_seen
             FROM detections
-            ORDER BY ts DESC
+            ORDER BY COALESCE(last_seen, ts) DESC
             LIMIT :limit
         """),
         {"limit": limit}
@@ -444,7 +444,9 @@ async def get_recent_detections(session: AsyncSession, limit: int = 20) -> List[
             "label": row[4],
             "score": row[5],
             "severity": row[6],
-            "details": row[7] if isinstance(row[7], dict) else json.loads(row[7]) if row[7] else {}
+            "details": row[7] if isinstance(row[7], dict) else json.loads(row[7]) if row[7] else {},
+            "occurrences": row[8] or 1,
+            "last_seen": row[9].isoformat() if row[9] else None,
         }
         for row in rows
     ]

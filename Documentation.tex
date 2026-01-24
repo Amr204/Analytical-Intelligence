@@ -1,0 +1,905 @@
+% =========================================================
+% قالب تخرج جامعي مبني على كتيّب التعليمات
+% يدعم Times New Roman عبر XeLaTeX + fontspec
+% =========================================================
+
+\documentclass[12pt,a4paper]{report} % نستخدم report لتوفير chapters (فصول)
+
+% ------------------------- الخطوط واللغات -------------------------
+% نستخدم XeLaTeX لضبط Times New Roman الحقيقي
+\usepackage{fontspec}            % تحميل خطوط النظام
+\setmainfont{Times New Roman}    % الخط الأساسي للنص والعناوين (حسب التعليمات)
+% في حال لم يكن الخط مثبتاً، ثبّت Times New Roman أو استبدله بـ "Times New Roman PS MT"
+% \setmainfont{Times New Roman PS MT}
+
+
+
+% ------------------------- الهوامش والمسافات -----------------------
+\usepackage[a4paper,margin=2.5cm]{geometry} % هوامش A4 قياسية
+\usepackage{setspace}
+\usepackage[bottom]{footmisc} % الحاشية السفلية
+\onehalfspacing % مسافة أسطر 1.5 كما يُفضَّل عادةً للتقارير
+\usepackage{fancyhdr}
+
+
+
+% ------------------------- رسومات/جداول/عناوين ---------------------
+\usepackage{graphicx}            % إدراج الصور
+\usepackage{caption}             % (يجب أن تُحمَّل قبل polyglossia/bidi لتفادي الخطأ)
+\usepackage{booktabs}            % جمال الجداول
+\usepackage{array}               % أعمدة p{...} وتوسعة خيارات الجداول
+% نوع عمود p{} لكن مُتمركز + يسمح بـ \\ في نهاية الخلية
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\usepackage{mdframed}            % لإطار العناوين (يجب قبل polyglossia/bidi)
+\usepackage{tocloft}             % للتحكم بشكل الفهارس
+\usepackage{enumitem}            % قوائم بنقاط مرتبة وتخصيص المسافات
+% تحسين نقط القادة (dots)
+\usepackage{float}
+\renewcommand{\cftdotsep}{1}      % تقارب النقاط
+\setlength{\cftbeforechapskip}{6pt}
+\setlength{\cftbeforesecskip}{2pt}
+\usepackage{comment}
+% --------- إعادة تعريف \chapter ليكون غلاف الفصل ---------
+\renewcommand{\chapter}[1]{%
+  \cleardoublepage
+  \refstepcounter{chapter}% زيادة عداد الفصل
+  \phantomsection
+  \addcontentsline{toc}{chapter}{\protect\numberline{\thechapter}#1}% إدخال في الفهرس
+  \thispagestyle{empty}% بدون رأس/تذييل
+
+  \begin{center}
+    \vspace*{0.3\textheight}
+    {\bfseries\itshape\fontsize{36}{40}\selectfont Chapter \thechapter}\\[1.5cm]
+    {\bfseries\fontsize{36}{40}\selectfont #1}
+  \end{center}
+
+  % إعادة ضبط ترقيم الأقسام
+  \setcounter{section}{0}%
+  \setcounter{subsection}{0}%
+  \setcounter{subsubsection}{0}%
+
+  \clearpage
+}
+
+
+%---------------- بيئة صندوق تشمل العنوان + المحتوى (mdframed بمفاتيح صحيحة)-----------
+\newenvironment{boxedlist}[1]{%
+  \begin{mdframed}[
+    linewidth=0.8pt,
+    roundcorner=2pt,
+    skipabove=10pt,
+    skipbelow=14pt,
+    innerleftmargin=14pt, innerrightmargin=14pt,
+    innertopmargin=8pt, innerbottommargin=12pt,
+    frametitle={\Large\bfseries #1},
+    frametitlealignment=\center,
+    frametitleaboveskip=2pt,
+    frametitlebelowskip=8pt
+  ]%
+}{%
+  \end{mdframed}%
+}
+
+
+% ------------------------- الترميز والروابط ------------------------
+% (hyperref يجب أن يحمَّل أيضاً قبل polyglossia/bidi لتفادي تحذيرات bidi)
+\usepackage{hyperref} % روابط داخلية وخارجية
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue,
+  pdftitle={Graduation Project},
+  pdfauthor={Student Name},
+  pdfsubject={Graduation Project Report}
+}
+
+% ------------------------- اللغات (ثنائي الاتجاه) -----------------
+% دعم العربية والإنجليزية (اختياري لكن مفيد لو كتبت بالعربية داخل المستند)
+% ملاحظة: تحميل polyglossia بعد كل الحزم أعلاه حتى لا يشتكي bidi.
+\usepackage{polyglossia}
+\setdefaultlanguage{english}     % لغة المستند الأساسية (كما في النموذج الإنجليزي)
+\setotherlanguage{arabic}        % لغة إضافية للعربية عند الحاجة
+\newfontfamily\arabicfont[Script=Arabic]{Times New Roman} % توحيد الخط أيضاً للنص العربي
+
+% ------------------------- الترقيم والعناوين -----------------------
+% report يرقم: Chapter 1, ثم Section 1.1, ثم Subsection 1.1.1 تلقائياً
+\setcounter{secnumdepth}{3} % ترقيم حتى subsubsection
+\setcounter{tocdepth}{3}    % إظهار حتى subsubsection في جدول المحتويات
+
+% (اختياري) تحكم أدق بشكل أرقام العناوين لو احتجت:
+% \renewcommand\thesection{\thechapter.\arabic{section}}
+% \renewcommand\thesubsection{\thesection.\arabic{subsection}}
+% \renewcommand\thesubsubsection{\thesubsection.\arabic{subsubsection}}
+
+% ------------------------- أدوات مرجعية (اختياري) ------------------
+% \usepackage[style=ieee]{biblatex}
+% \addbibresource{references.bib}
+
+
+% =========================================================
+%                 بداية المستند
+% =========================================================
+
+\begin{document}
+
+% ------------------------- صفحة الغلاف ----------------------------
+% التعليمات تحدد: العنوان Times New Roman حجم ~20 Bold،
+% أسماء الطلاب والخ، وخط الأساس 12pt لباقي الصفحات. (المقاسات هنا قريبة جداً للمذكور)
+\begin{titlepage}
+  \centering
+
+ \begin{minipage}[t]{0.62\textwidth}\vspace{0pt}
+    \raggedright
+    \textbf{Republic of Yemen}\\
+    Ministry of Higher Education and\\
+    Scientific Research\\
+    University of Science and Technology\\
+    Faculty of Computing and Information Technology
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.28\textwidth}\vspace{0pt}
+    \raggedleft
+    \includegraphics[height=2.7cm]{images/UST-logo.png}
+\end{minipage}
+
+\vspace{2.8cm}
+
+  % عنوان المشروع بحجم كبير وبولد (قريب من 20pt)
+  {\fontsize{20pt}{22pt}\selectfont \textbf{Analytical Intelligence AI: Ubuntu Server Intelligence Log Collection and Analysis Tool}}\\[1.5cm]
+
+  % أسماء الطلاب وأرقامهم (تقريبًا 16pt بحسب الإرشادات)
+  {\fontsize{16pt}{18pt}\selectfont
+  Amr Khaled AL-Awadhi \hfill 202210400203\\
+  Nezar Faris AL-Hammadi \hfill Student No.\\
+  Haitham Adnan AL-Shawafi \hfill Student No.\\
+  Abdulrahman Abdulmalek AL-Halqi \hfill Student No.\\
+  [2.0cm]
+  }
+
+  % المشرف
+  {\fontsize{16pt}{18pt}\selectfont \textbf{Supervised by}}\\[0.5cm]
+  {\fontsize{16pt}{18pt}\selectfont Dr. Wedad AL-Sorori}\\
+  {\fontsize{14pt}{16pt}\selectfont Lecturer at the University of Science and Technology}\\[3.5cm]
+
+  % وصف مختصر أسفل الصفحة + السنة
+  {\normalsize
+  A graduation project document submitted to the Department of Information Technology in partial\\
+  fulfillment of the requirements for Bachelor’s degree in Cybersecurity}\\[1.5cm]
+
+  {\Large \textbf{2025}\par}
+
+\end{titlepage}
+
+% ====================== FRONT MATTER (ROMAN) ======================
+\clearpage
+\pagenumbering{Roman}
+
+
+% ----------------------------- Summary -----------------------------
+\addcontentsline{toc}{chapter}{Summary}
+\begin{mdframed}[
+  linewidth=0.8pt,
+  roundcorner=2pt,
+  skipabove=10pt,
+  skipbelow=14pt,
+  innerleftmargin=14pt,
+  innerrightmargin=14pt,
+  innertopmargin=25pt,   % ← بدلاً من 8pt
+  innerbottommargin=25pt
+]
+
+
+  % العنوان في الوسط
+  \begin{center}
+    {\bfseries\large Summary}
+  \end{center}
+
+
+  % النص الأساسي (حجم 12 في مستند 12pt)
+  \vspace{6pt}
+  {\normalsize
+  The summary of the graduation project document should not exceed one page.
+  The summary should contain the following:
+  }
+
+  % نقاط المحتوى كما بالصورة
+  \vspace{4pt}
+  \begin{itemize}[left=16pt,itemsep=2pt,topsep=4pt]
+    \item Introduction statement
+    \item Problem definition
+    \item Main objectives of the graduation project
+    \item SW/HW Tools
+    \item Results
+    \item Conclusions and recommendations (in short)
+  \end{itemize}
+\end{mdframed}
+
+% --------------------------- Authorization --------------------------
+\addcontentsline{toc}{chapter}{Authorization}
+\begin{mdframed}[
+  linewidth=0.8pt,
+  roundcorner=2pt,
+  skipabove=10pt,
+  skipbelow=14pt,
+  innerleftmargin=14pt,
+  innerrightmargin=14pt,
+  innertopmargin=25pt,
+  innerbottommargin=25pt
+]
+  \begin{center}
+    {\bfseries\large Authorization}
+  \end{center}
+
+  {\normalsize
+  We authorize University of \dotfill\ Faculty of \dotfill\ to supply copies of our
+  graduation project report to libraries, organizations or individuals on request.
+  }
+
+  \vspace{8pt}
+
+% جدول مُحاط بخطوط عمودية وأفقية، كل الأعمدة مُتمركزة
+\renewcommand{\arraystretch}{1.3} % ارتفاع صفوف أريح
+\begin{tabular}{|C{0.40\linewidth}|C{0.23\linewidth}|C{0.17\linewidth}|}
+  \hline
+  \textbf{Student Name} & \textbf{Student No.} & \textbf{Signature} \\
+  \hline
+  % صفوف فارغة للتوقيع (أضف \rule لارتفاع بسيط)
+  \rule{0pt}{2.2ex} & & \\ \hline
+  \rule{0pt}{2.2ex} & & \\ \hline
+  \rule{0pt}{2.2ex} & & \\ \hline
+\end{tabular}
+
+  \vspace{8pt}
+
+  {\normalsize Date: \dotfill}
+\end{mdframed}
+
+% ----------------------------- Dedication ---------------------------
+\addcontentsline{toc}{chapter}{Dedication}
+\begin{mdframed}[
+  linewidth=0.8pt,
+  roundcorner=2pt,
+  skipabove=10pt,
+  skipbelow=14pt,
+  innerleftmargin=14pt,
+  innerrightmargin=14pt,
+  innertopmargin=25pt,
+  innerbottommargin=25pt
+]
+  \begin{center}
+    {\bfseries\large Dedication}
+  \end{center}
+
+  % سطر التوضيح كما في الصورة
+  {\normalsize This page is optional. The students can dedicate their project in this page.}
+
+  \vspace{8pt}
+  \textbf{Example}
+
+  \vspace{2pt}
+  {\normalsize
+  To our families who made this achievement possible.
+  }
+\end{mdframed}
+
+
+% ------------------------- Acknowledgment --------------------------
+\clearpage
+\addcontentsline{toc}{chapter}{Acknowledgment}
+\begin{boxedlist}{Acknowledgment}
+  % اكتب الشكر وفق الصيغة المقترحة في الكتيّب
+  We would like to express our deepest gratitude to our families, colleagues, and instructors
+  who provided continuous support and guidance throughout the preparation of this graduation project.
+\end{boxedlist}
+
+% ------------------------- Supervisor Certification ----------------
+\clearpage
+\addcontentsline{toc}{chapter}{Supervisor Certification}
+\begin{boxedlist}{Supervisor Certification}
+  We certify that the preparation of this project entitled ``\dots'' prepared by \dots\ 
+  was made under my supervision at \dots\ department in partial fulfillment of the requirements 
+  for the Bachelor Degree in \dots.
+  
+  \vspace{1cm}
+  Supervisor Name \hfill Signature \hfill Date
+\end{boxedlist}
+
+% ------------------------- Examination Committee -------------------
+\clearpage
+\addcontentsline{toc}{chapter}{Examination Committee}
+\begin{boxedlist}{Examination Committee}
+  \noindent\textbf{Project Title:} \dotfill
+
+  \vspace{0.8cm}
+  \noindent\textbf{Supervisor}\\[0.3cm]
+  \begin{tabular}{@{}p{0.6\linewidth}p{0.2\linewidth}p{0.15\linewidth}@{}}
+    \textbf{Name} & \textbf{Position} & \textbf{Signature}\\
+    \rule{0.9\linewidth}{0.4pt} & \rule{0.9\linewidth}{0.4pt} & \rule{0.9\linewidth}{0.4pt}\\
+  \end{tabular}
+
+  \vspace{0.8cm}
+  \noindent\textbf{Examination Committee}\\[0.3cm]
+  \begin{tabular}{@{}p{0.6\linewidth}p{0.2\linewidth}p{0.15\linewidth}@{}}
+    \textbf{Name} & \textbf{Position} & \textbf{Signature}\\
+    \rule{0.9\linewidth}{0.4pt} & \rule{0.9\linewidth}{0.4pt} & \rule{0.9\linewidth}{0.4pt}\\
+    \rule{0.9\linewidth}{0.4pt} & \rule{0.9\linewidth}{0.4pt} & \rule{0.9\linewidth}{0.4pt}\\
+    \rule{0.9\linewidth}{0.4pt} & \rule{0.9\linewidth}{0.4pt} & \rule{0.9\linewidth}{0.4pt}\\
+  \end{tabular}
+
+  \vspace{0.6cm}
+  Department Head \dotfill
+\end{boxedlist}
+% ------------------------- جدول المحتويات والقوائم -----------------
+% ===================== Front Matter Lists =====================
+% نجعل الصفحات التمهيدية بالأرقام الرومانية:
+
+
+%------------------- Boxed Title Helper -------------------
+% دالة مساعدة لعنوان داخل إطار كما في الصورة
+\newcommand{\boxedtitle}[1]{%
+  \begin{center}
+    \begin{mdframed}[linewidth=0.8pt, innertop=8pt, innerbottom=8pt, innerleft=14pt, innerright=14pt]
+      \centering \Large\bfseries #1
+    \end{mdframed}
+  \end{center}
+}
+
+%------------------- Table of Contents -------------------
+\clearpage
+\addcontentsline{toc}{chapter}{Table of Contents} % إدراج بالفهارس (روماني)
+\begin{boxedlist}{Table of Contents}
+  % نخفي عنوان \tableofcontents الافتراضي حتى لا يتكرر
+  \begingroup
+    \renewcommand{\contentsname}{}%
+    \tableofcontents
+  \endgroup
+\end{boxedlist}
+
+
+%------------------- List of Figures ---------------------
+\clearpage
+\addcontentsline{toc}{chapter}{List of Figures}
+\begin{boxedlist}{List of Figures}
+  \begingroup
+    \renewcommand{\listfigurename}{}%
+    \listoffigures
+  \endgroup
+\end{boxedlist}
+
+%------------------- List of Tables ----------------------
+\clearpage
+\addcontentsline{toc}{chapter}{List of Tables}
+\begin{boxedlist}{List of Tables}
+  \begingroup
+    \renewcommand{\listtablename}{}%
+    \listoftables
+  \endgroup
+\end{boxedlist}
+
+\begin{comment}
+%------------------- List of Abbreviations ---------------
+\clearpage
+\addcontentsline{toc}{chapter}{List of Abbreviations}
+\begin{boxedlist}{List of Abbreviations}
+  \begin{center}
+    \begin{tabular}{@{}p{0.22\linewidth}p{0.70\linewidth}@{}}
+      \toprule
+      \textbf{Acronym} & \textbf{Definition} \\
+      \midrule
+      ARQ  & Automatic Repeat Request \\
+      AWGN & Additive White Gaussian Noise \\
+      BS   & Base Station \\
+      CA   & Carrier Aggregation \\
+      CoMP & Coordinated MultiPoint Transmission \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+\end{boxedlist}
+
+%------------------- Mathematical Notation (Optional) ----
+\clearpage
+\addcontentsline{toc}{chapter}{Mathematical Notation (Optional)}
+\begin{boxedlist}{Mathematical Notation (Optional)}
+  \begin{center}
+    \begin{tabular}{@{}p{0.28\linewidth}p{0.62\linewidth}@{}}
+      \toprule
+      \textbf{Parameter} & \textbf{Description} \\
+      \midrule
+      $B_{\!RB}$    & Resource block bandwidth. \\
+      $E_c^{(0)}$   & Available energy in relay $i$ at the end of frame $i$. \\
+      % أضف المزيد حسب حاجتك
+      \bottomrule
+    \end{tabular}
+  \end{center}
+\end{boxedlist}
+
+\end{comment}
+% ------------------------- بدء المتن (أرقام عربية) -----------------
+\clearpage
+\pagenumbering{arabic} % يبدأ Chapter 1 من صفحة 1 بالأرقام العربية
+
+
+% ----------------------------- Page Style -----------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Analytical Intelligence Project}
+\rhead{Chapter One: Introduction}
+\cfoot{\thepage}
+
+% ------------------------- الفصل 1: Introduction -------------------
+\chapter{Introduction}
+% بإمكانك اتباع تنظيم فصل المقدمة كما ظهر في جدول المحتويات المقترح بالكتيّب:
+\section{Overview}
+With the significant expansion we are witnessing in recent years due to the use of digital systems and a wide range of online services, the collection and analysis of system logs has become critically important to ensure information security, detect potential threats, and develop effective countermeasures. Logs are a rich source of information about activities occurring within systems and networks, as they record everything that happens in the system. However, the challenge lies in analyzing the massive volume of data quickly and efficiently to enable the early detection of attacks or abnormal behaviors.
+
+a lot of companies tend to use some of the famous systems such as Splunk\footnote{Splunk is a commercial platform for searching, monitoring, and analyzing machine-generated data via a web-style interface.}, Graylog\footnote{Graylog is an open-source log management tool for collecting, indexing, and analyzing both structured and unstructured data.}, and other Security Information and Event Management (SIEM) platforms.
+
+these tools are often expensive and complex for many organizations with limited budgets.
+
+This is where our project idea, "Analytical Intelligence" and we call it (AI), comes in — a simple yet intelligent tool for collecting and analyzing system logs, supported by artificial intelligence techniques to detect the most common anomalies and attacks, using flexible software technologies.
+\section{Problem Statement}
+Many small organizations lack systems for monitoring and analyzing logs to detect any problems they may encounter, especially on Ubuntu servers. This is due to the difficulty of managing these servers, often due to the high cost or technical complexity of the systems. This has led to numerous risks, including a limited ability to detect attacks at an early stage, difficulty tracking security incidents and analyzing their causes, and reliance on manual methods, which has slowed operations and increased the number of vulnerabilities that cause various problems.
+
+Therefore, a software solution was needed that was easy to deploy, affordable, and supported intelligent log analysis.
+
+\section{Project Objectives}
+The primary goal of this project is to develop a simple and intelligent tool for collecting and analyzing Ubuntu server logs via a dashboard, using modern technologies and artificial intelligence to detect suspicious activity and generate reports. Sub-goals include designing an easy-to-use graphical interface for viewing and analyzing logs, supporting log collection from Ubuntu servers, implementing artificial intelligence algorithms for automatic anomaly detection, and providing alerts when suspicious activity occurs.
+
+
+\section{Project Scope and Limitations}
+\begin{itemize}[leftmargin=*]
+   \item This tool is specifically designed for Ubuntu server environments and is not intended to replace full-scale business SIEM platforms.
+   \item The tool focuses on collecting logs that may have the most common attacks.
+   \item Accuracy depends on the quality and quantity of available log data that it collected.
+   \item Machine learning algorithms may occasionally produce false positives.
+   \item The dashboard displays results and reports in PDF and CSV formats.
+\end{itemize}
+\section{Project Methodology}
+This project takes a systematic approach to designing, developing, and evaluating an intelligent, easy-to-use log analysis system for Ubuntu server environments. It aims to support security monitoring through intelligent anomaly detection in logs, leveraging locations that enhance alert accuracy, and artificial intelligence models that provide more accurate information.
+
+The methodology consists of the following key phases:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Requirement Analysis:} Identifying the requirements and needs of small and medium-sized organizations regarding log management, especially on Ubuntu-based servers.
+    
+    \item \textbf{Log Collection Design:} Configure a secure and modern log collection pipeline with Filebeat to collect logs from Ubuntu Server environments.
+
+    \item \textbf{Log Preprocessing:} Filter, parse, and normalize collected logs into a structured format suitable for machine learning and analysis.
+
+    \item \textbf{Anomaly Detection Engine:} Implement machine learning models such as Isolation Forest to automatically detect anomalous behaviors or suspicious in logs.
+
+    \item \textbf{Dashboard Interface:} Develop a simple and interactive web dashboard by using Flask to display real-time system status, alerts, and reports.
+
+    \item \textbf{Testing and Evaluation:} Experiment with the system and test its anomaly detection performance using real logs from ubuntu server to improve response.
+\end{enumerate}
+\begin{comment}
+    % إضافة الصورة
+\begin{figure}[H] % الصورة ثابتة في نفس المكان  [H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/methodology.png} % ضع هنا مسار الصورة
+    \caption{Project Methodology Diagram}
+    \label{fig:methodology}
+\end{figure}
+\end{comment}
+
+
+\section{Report Organization}
+This report is divided into  chapters, each one will focus on a part of the project:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Chapter 1:} Introduces the overview, problem statement, objectives, methodology, and scope of the project.
+    \item \textbf{Chapter 2:} Reviews related work, and tools relevant to log analysis and anomaly detection.
+    \item \textbf{Chapter 3:} Describes the architecture, components of the system, and project models.
+    \item \textbf{Chapter 4:} Explains the design of the system, how it works, and some project codes.
+    \item \textbf{Chapter 5:} Details the implementation process and which tools are used.
+    \item \textbf{Chapter 6:} Summarizes the results and discussions.
+    \item \textbf{Chapter 7:} Conclusion and suggests improvements and potential future recommendations.
+    \item \textbf{Chapter 8:} References of the project.
+\end{itemize}
+
+% ------------------------- الفصل 2: Background & LR ----------------
+
+% ----------------------------- Page Style -----------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Analytical Intelligence Project}
+\rhead{Chapter Two: Background and Literature Review}
+\cfoot{\thepage}
+
+\chapter{Background and Literature Review}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/Background ch2.png}
+    \caption{System Block Diagram}
+    \label{fig:block}
+\end{figure}
+
+\section{Background}
+\subsection{Cybersecurity}
+Humanity today lives in an unprecedentedly interconnected era, where technology has become the backbone of daily life. It is no longer just an invention serving humanity; it is an indispensable infrastructure supporting several important sectors, such as communications, finance, corporate governance, and public services. However, this renaissance always comes with downsides and risks. Any flaw or vulnerability in digital systems can directly impact individuals, businesses, and even entire nations.
+
+Therefore, cybersecurity has emerged as a fundamental response to modern stability, protecting data and digital assets from theft, tampering, and disruption. Societies unable to protect their infrastructure are at risk of collapse and social unrest. Today, cybersecurity is just as important as physical security for maintaining trust and enabling progress.
+
+\subsection{System Security}
+Cybersecurity is a comprehensive framework designed to protect organizations and individuals from various cyber threats. The increasing reliance on internet-connected devices has led to new challenges, including data leakage, hacking, and cyberattacks that attempt to exploit security vulnerabilities.
+
+System security addresses these risks through several layers that contribute to mitigating vulnerabilities, such as network security, endpoint security, authentication and authorization mechanisms such as two-factor authentication or biometrics, security, and incident response. These measures ensure that systems remain robust against exploitation and unauthorized access.
+
+\subsection{Servers}
+Servers are the backbone of digital infrastructure, designed to provide high speed, resources, and shared services to multiple users simultaneously. Unlike personal computers, servers are optimized for stability, scalability, continuous operation, and high-volume operation. They host websites, databases, email systems, and cloud software.
+
+Given their critical importance, servers are a prime target and frequent victim of cyberattacks. A single compromised server can allow attackers to access sensitive user data or control entire networks. There are different types of servers, such as:
+\begin{itemize}[leftmargin=*]
+   \item Windows Server
+   \item Ubuntu Server
+   \item RHEL Server, and a lot of different OS.
+\end{itemize}
+
+\subsection{Ubuntu Server}
+Operating systems form the foundation of digital infrastructure, acting as an intermediary between devices and users. Any vulnerability in this layer could open the door to hackers.
+
+Among the most widely used operating systems in enterprise environments are Ubuntu servers, known for their speed and high security. Servers host websites, databases, and cloud software, making them prime targets for cyberattacks. Therefore, server security includes:
+\begin{itemize}[leftmargin=*]
+   \item Regular fixes and updates.
+   \item Strict access control, permission management, and privilege escalation.
+   \item Firewall configuration and intrusion prevention.
+   \item Continuous monitoring through Dashboard interface.
+\end{itemize}
+
+\subsection{Logs}
+Logs are the living memory of any system, recording every event, transaction, and anomaly that occurs on the system. In Ubuntu Server environments, they include:
+\begin{itemize}[leftmargin=*]
+   \item Management logs.
+   \item Security logs.
+   \item System logs.
+   \item Applecation logs.
+   \item Network logs.
+\end{itemize}
+
+\subsection{Security Logs}
+Security logs are a specialized category of log files that focus on events that impact system security. These logs include firewall activity, failed or repeated login attempts, privilege escalations, and any suspicious behavior that might indicate an attempted attack.
+
+The main objectives of security logs are:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Threat Detection:} Identifying unauthorized access attempts and malicious activities.
+    \item \textbf{Forensics:} It is considered a strong reference in the event of a crime.
+    \item \textbf{Real-Time Monitoring:} Enabling administrators to receive alerts and respond to threats immediately.
+\end{itemize}
+
+\subsection{Anomaly Detection}
+As organizations grow, the volume of stored logs increases, often reaching millions of events per day.
+
+Manual review becomes impossible, leading to the adoption of advanced log management platforms such as Graylog and Splunk. These systems focus on log collection and issue real-time alerts for critical events.
+
+The real challenge is distinguishing normal system behavior from malicious or suspicious patterns.
+
+Anomaly detection addresses this by automatically identifying anomalies, such as:
+
+\begin{itemize}[leftmargin=*]
+    \item Rule-Based Detection.
+    \item Rule-Based ML
+    \item Heuristic Analysis
+\end{itemize}
+
+\subsection{Rule-Based Machine Learning}
+One of the most popular methods is rule-based, but it sometimes produces many false positives or fails to detect new attack methods.
+
+Machine learning (ML) provides a more adaptive approach, learning the system's normal behavior and identifying events that may be deviant.
+
+ML techniques used for anomaly detection include:
+\begin{itemize}[leftmargin=*]
+    \item Supervised learning algorithms (like classification models).
+    \item Unsupervised learning methods (like Isolation Forest, K-Means).
+    \item Deep learning models (like LSTM networks for time-series logs).
+\end{itemize}
+
+\section{Literature Review}
+\subsection{Introduction}
+The literature review aims to provide an overview of studies related to our system and previous approaches in the field of log analysis, anomaly detection, and methods, focusing on their methodologies, strengths, weaknesses, and the tools used.
+By analyzing this work, we can identify what has been achieved to date and the gaps that remain open for future research and development.
+
+This review also discusses the similarities between the various literatures and compares them to our proposed system.
+
+Finally, it highlights the research gap we seek to address through our project.
+
+\subsection{Zero-Day Exploit Detection in Network Flows}
+According to \cite{Toure2024}, a hybrid framework combining supervised classification,
+unsupervised clustering, and online learning was proposed to detect zero-day attacks.
+
+Using datasets such as IBM and NSL-KDD, the system achieved high accuracy in identifying zero-day vulnerabilities, while minimizing false positives.
+
+This study emphasizes the need to integrate diverse learning approaches, but also highlights challenges related to computational complexity and feature engineering.
+
+\subsection{Optimized Deep Isolation Forest (ODIF)}
+Galka (2025) presents ODIF, an improved version of Deep Isolation Forest, which reduces computational costs and memory usage while maintaining anomaly detection accuracy.
+
+By simplifying data representation and eliminating duplicate processing, ODIF facilitates isolation-based anomaly detection in large-scale or resource-constrained environments.
+
+This work demonstrates how efficiency improvements can enhance the applicability of AI methods in cybersecurity, but they are weak when the tree depth is large. 
+
+\subsection{Collaborative Intrusion Detection Systems (CIDS)}
+Gómez et al. (2025) present a framework for collaborative intrusion detection in log data, emphasizing decentralized cooperation 
+across organizations and systems.  
+The study categorizes detection approaches into sequential, embedding, and graph-based methods, and highlights the role 
+of collaboration in reducing false positives.  
+Their open-source evaluation platform provides a structured benchmark for testing algorithms, underlining the need 
+for reproducibility and standardized assessment in log anomaly detection research.  
+
+\subsection{ADALog: Adaptive Unsupervised Anomaly Detection in Logs}
+Zaremba et al. (2025) propose ADALog, a self-attention–based framework that leverages a pre-trained DistilBERT model 
+to detect anomalies in unstructured logs without requiring labeled data or parsing.  
+The model achieves competitive performance on benchmark datasets while improving interpretability through heatmap visualization.  
+However, its reliance on high computational resources and batch processing indicates the need for further optimization.  
+
+\subsection{LogBERT: Log Anomaly Detection via BERT}
+Guo et al. (2021) introduce LogBERT, a framework that applies BERT to system logs using self-supervised learning.  
+The model captures contextual dependencies through tasks such as masked log key prediction and clustering of normal behavior.  
+Experiments on datasets like HDFS and BGL show that LogBERT outperforms traditional and deep learning baselines.  
+While effective, it relies on log parsers and hyperparameter tuning, which may limit adaptability in dynamic environments.  
+
+\subsection{LAnoBERT: Log Anomaly Detection without Log Parsers}
+Lee, Kim, and Kang (2021) extend LogBERT by removing the dependency on log parsers, enabling direct analysis of raw log data.  
+Using BERT’s masked language modeling, LAnoBERT improves flexibility and robustness across different log formats, 
+achieving competitive performance compared to parser-based models.  
+Its strengths lie in simplicity and adaptability, though it remains computationally demanding and less interpretable 
+than other approaches.  
+
+\subsection{Temporal Logical Attention Network (TLAN)}
+Liu et al. (2024) propose TLAN, a model that captures temporal and logical relationships in log sequences using multi-scale 
+feature extraction and attention mechanisms.  
+Tested on distributed system logs, it improves detection of multi-step attacks such as SSH brute force followed 
+by privilege escalation.  
+Despite higher computational requirements, TLAN demonstrates the importance of modeling sequential dependencies 
+for advanced log anomaly detection.  
+
+\subsection{Semi-Supervised Framework for ALICE O$^{2}$}
+Krupa et al. (2025) develop a semi-supervised framework for real-time anomaly detection in CERN’s ALICE O$^{2}$ logs.  
+By combining limited labeled anomalies with abundant normal data, the system balances supervised and unsupervised learning, 
+improving detection accuracy and adaptability.  
+This approach shows promise for large-scale infrastructures, though scalability and generalization remain key challenges 
+for broader adoption.  
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/table-of-researches.png}
+    \caption{Literature Review}
+    \label{fig:LiteratureReview}
+\end{figure}
+
+\section{Tools}
+In recent years, researchers have developed specialized tools for log management and security analysis. These tools range from free to paid, each designed to meet organizations' needs in a way that best suits them. Most tools are designed for environments that handle massive amounts of data. This diversity is driven by the growing demand for flexible, scalable, and reliable cybersecurity solutions. Here, we review the most popular and widely used tools.
+\subsection{Graylog}
+Graylog is an open-source log management platform that allows centralized log collection, storage, and analysis. It provides dashboards, search functionality, and real-time alerts, making it a great option for small and medium-sized organizations.
+
+\subsection{Splunk}
+Splunk is a widely used enterprise-grade tool for real-time log analysis and SIEM. It excels at processing large datasets and offers advanced search and visualization features. However, it comes with significant licensing costs.
+
+\subsection{Elastic Stack (ELK)}
+The ELK stack (Elasticsearch, Logstash, Kibana) is a flexible, open-source solution for log ingestion, indexing, and visualization. It's highly customizable, but requires technical expertise for deployment and maintenance.
+
+\subsection{LogBERT}
+LogBERT is a research-oriented framework that uses BERT-based models to detect anomalies in logs. It doesn't require labeled data and provides high accuracy, making it effective for server and operating system environments.
+
+\subsection{ADALog}
+ADALog uses DistilBERT for unsupervised anomaly detection in unstructured logs. It's accurate and interpretable, but it works in batch mode and needs high-performance hardware.
+
+\subsection{Sumo Logic}
+Sumo Logic is a cloud-native log analytics platform that integrates machine learning for security monitoring and performance insights. It offers scalability and is ideal for cloud-based systems.
+
+\subsection{Datadog Log Management}
+Datadog integrates log collection with infrastructure and performance metrics. It's effective for distributed systems and microservices, offering unified observability.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/table-of-tools.png}
+    \caption{Literature Review}
+    \label{fig:LiteratureReview}
+\end{figure}
+
+\section{Gab Research}
+
+Despite advances presented in previous studies, ranging from hybrid zero-day vulnerability detection frameworks to transformer-based models such as LogBERT, LAnoBERT, and ADALog, several challenges remain:
+
+\begin{itemize}
+    \item \textbf{High computing requirements:} Most existing approaches, particularly those based on transformers, rely on high computing resources, limiting their deployment to small and medium-sized enterprises with limited resources.
+    
+    \item \textbf{Reliance on standard datasets only:} Despite achieving strong results on datasets such as HDFS and BGL, these models are rarely tested on live Ubuntu logs, weakening their reliability in practical use.
+    
+    \item \textbf{Balancing scalability and ease of use:} Deep learning models achieve high accuracy, but they are often complex to configure and operate, making them unsuitable for non-expert administrators.
+    
+    \item \textbf{Lack of standard frameworks and standardized evaluation tools:} The lack of reproducible testing environments or standardized evaluation metrics makes it difficult to compare models and generalize results across different environments.
+    
+    \item \textbf{Poor explainability:} Some models, such as ADALog, offer good accuracy but lack clear mechanisms for explaining their decisions, which reduces security administrators' confidence in the results.
+\end{itemize}
+
+These vulnerabilities highlight the need for a simple, flexible, and easy-to-interpret anomaly detection framework that balances efficiency and ease of use and provides immediate alerts. Our project addresses these needs by developing an AI-powered log analysis platform, specifically designed for Ubuntu servers, with the goal of reducing costs, simplifying deployment, and improving anomaly detection accuracy without requiring advanced hardware or expertise.
+
+% =========================== الفصل 3: Requirements ======================
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Analytical Intelligence Project}
+\rhead{Chapter Three: Requirements Analysis and Modeling}
+\cfoot{\thepage}
+
+\chapter{Requirements Analysis and Modeling}
+\section{Introduction}
+In this chapter, we outline the key requirements for an analytical intelligence (AI) tool, which combines speed and simplicity to collect, process, and analyze security logs from an Ubuntu server.
+
+Unlike heavy-duty SIEM systems, this system focuses on clarity and low costs, making it suitable for small and medium-sized businesses. This chapter presents the foundations of design and modeling by defining the architecture, feasibility, methodology, and requirements. At the end of this chapter, we present models and diagrams (block diagram, use case, DFD, and database schema) to provide a clearer picture of the system and understand the requirements.
+
+\section{System Description}
+Analytical Intelligence (AI) is based on a multi-layered architecture focused on speed and ease of use. Specifically used for Ubuntu servers, each layer has a stage that explains a portion of the system's log lifecycle—from log collection, through filtering and cleaning, to detection/analysis, and finally, reporting. The layers are interconnected via flowcharts that illustrate the system's operation, allowing for continuous updates and work.
+
+\section{Feasibility Study}
+The feasibility of the system system will be evaluated through feasibility testing (technical, legal, operational and economic).
+
+\subsection{Technical Feasibility}
+The system relies on modern, widely adopted open source technologies, such as Ubuntu Server, rsyslog, Filebeat, Logstash, and Elasticsearch. These technologies and tools have proven their technical proficiency and robustness, making them reliable components that ensure stability, scalability, and reliability even under challenging conditions.
+
+The system uses Python for analysis, enrichment, and anomaly detection, making it flexible, given that it is one of the most widely used and powerful programming languages in the field of artificial intelligence. It also includes comprehensive libraries dedicated to data processing, machine learning, and cybersecurity.
+
+By leveraging this technology stack, the system avoids the costs and limitations of proprietary solutions, while maintaining the adaptability needed to integrate additional modules in the future. Its robust architecture allows organizations to start with an easy setup, running on a single server, and scale to multiple servers as log volumes or analysis requirements increase.
+
+\subsection{Legal Feasibility}
+Legal feasibility is a critical factor for any system intended for distribution to businesses and others, as records often contain sensitive details such as IP addresses, usernames, and timelines of user activity, all of which may fall under privacy regulations.
+
+To mitigate risks, the system is designed with strict adherence to internationally recognized frameworks such as the General Data Protection Regulation (GDPR). Encryption is applied to data in transit and storage, while role-based access control ensures that only authorized users have access to sensitive information, with user control controlled by the administrator.
+
+The system relies exclusively on open source components subject to permissive licenses such as the MIT License, which legally permits the code to be used for any purpose, whether commercial or non-commercial. This ensures that organizations adopting this system face minimal legal risk while maintaining compliance with global standards such as ISO/IEC 27001.
+
+\subsection{Operational Feasibility}
+Operational feasibility is essential for a system, determining its effectiveness in real-world environments.
+
+The platform is designed to be easy and practical, capable of operating efficiently even with medium-performance hardware. Its dashboards and analysis capabilities are simple and intuitive, enabling administrators and analysts to quickly interpret security events without the need for advanced security expertise.
+
+This ease of use significantly reduces training and time requirements, especially for academic institutions and small and medium-sized businesses that may not have dedicated security teams.
+
+We also offer real-time alerts, ensuring that incidents such as brute-force login attempts, privilege escalation, or suspicious IP addresses are detected and reported immediately to the appropriate personnel.
+
+\subsection{Economic Feasibility}
+Most importantly, it's economical. The system is designed to reduce overall costs while maintaining the option to expand when needed.
+
+This solution relies on open source components with no licensing fees and can operate effectively on a single mid-range server in small or academic environments. Therefore, costs are concentrated on the one-time hardware acquisition and limited ongoing operations (electricity, storage, and simple administration time).
+
+It's also supported by artificial intelligence, which reduces attack detection time and aids in rapid analysis of various logs.
+
+\begin{table}[H]
+\centering
+\caption{Economic Feasibility — Cost Table (Lean)}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Item} & \textbf{Type} & \textbf{Frequency} & \textbf{Est. Cost (USD)} \\
+\hline
+Ubuntu server (8 vCPU, 8 GB RAM) & CAPEX & One-time & --- \\
+SSD storage (512 GB) & CAPEX & One-time & 30 \\
+Electricity & OPEX & Monthly & 10 \\
+Internet & OPEX & Monthly & 14 \\
+Team & OPEX & Monthly & 500 \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Methodology}
+The system follows the Agile methodology. This approach allows the system to be implemented systematically while maintaining sufficient flexibility to accommodate improvements, feedback, and upcoming security challenges.
+
+The process begins with the planning phase, where the overall project goals are defined and the key challenges of analyzing Ubuntu security logs are identified.
+
+Following the planning phase, the requirements gathering phase is implemented, focusing on an in-depth analysis of security logs and the types of attacks they reveal. This phase leads to a comprehensive understanding of the logs and contributes to designing an architecture capable of handling them efficiently.
+
+Then, the system design phase begins, producing architecture diagrams, workflows, and system models that formalize the layered architecture of AI. The focus is on developing each layer—collection, processing, detection, and presentation—independently without disrupting the entire system.
+
+\subsection{Data Collection Layer}
+The data collection layer is the core of the system, and its primary purpose is to collect real-time logs from the Ubuntu server. These logs are collected from multiple critical sources. Auth logs (/var/log/auth.log) capture failed login attempts, abusive SSH activity, and sudo usage, providing essential insights into authentication security. Auditd logs record user and process activities, such as creating or deleting accounts, executing suspicious files, and accessing sensitive files. Meanwhile, iptables logs, which are network-level, record blocked traffic, unauthorized access attempts, and port scanning behavior.
+
+Some of the best services for collecting logs are rsyslog, which efficiently redirects logs, and Filebeat, a proxy that structures and transmits data with minimal resource consumption. The system incorporates secure transport protocols such as TLS to protect logs during transmission, ensuring confidentiality and integrity.
+
+\subsection{The Processing Layer}
+When logs are collected, they move to the processing layer, where the raw data is transformed into a format suitable for structured analysis, such as JSON. The processing layer is responsible for normalization, enrichment, and filtering, enabling consistent and accurate analysis across different data sources. Enrichment adds contextual information to each log entry, such as geolocation details for suspicious IP addresses or severity levels based on predefined criteria. Filtering mechanisms then remove duplicate data and irrelevant noise, retaining only useful data for further examination. This layer leverages tools like Logstash for analysis and transformation, along with custom Python scripts that enable advanced enrichment and domain-specific filtering rules. This results in organized and consistent data.
+
+\subsection{Detection and Analysis Layer}
+At the detection and analysis layer, structured logs are transformed into actionable data. The system combines rule-based and anomaly detection techniques to balance efficiency and adaptability. Rule-based detection operates on predefined, static logic, for example, flagging an IP address that attempts more than five failed SSH logins within 60 seconds as an indicator of a brute force attack, or identifying unusual patterns of sudo usage as a potential privilege escalation attempt. While these rules are effective at detecting well-documented threats, their ability to identify new or advanced attack techniques that do not conform to existing patterns is limited.
+
+To overcome these challenges, the system had to integrate machine learning-powered anomaly detection techniques. By learning the basics of normal system behavior—such as typical login times, average network traffic levels, or common command execution patterns—the system can identify changes that may indicate malicious activity. For example, a sudden spike in outgoing network traffic, an unusual sequence of commands executed, or login attempts from unexpected geographic regions could be classified as anomalies for further investigation.
+
+
+\subsection{Presentation Layer}
+The presentation layer sits at the top of the system architecture and is designed to provide administrators and security analysts with a clear, intuitive, and actionable interface for system activity. Visualization tools like Kibana are used to create interactive dashboards that transform complex log data into clear insights. Dashboards present data through visual elements such as heatmaps, which display the frequency and severity of brute force attacks, and time series graphs, which track the evolution of events over time.
+
+The presentation layer also supports the creation of exportable reports in formats such as PDF and CSV. Combining ease of use with powerful analytical capabilities, this layer ensures that even users with limited technical expertise can easily monitor the system through an interface that provides the essential monitoring requirements.
+
+
+\section{Functional Requirements}
+\subsection{Scope \& Collection}
+The system's functional requirements define the core capabilities the platform must provide to achieve its goals as an intelligent log analysis and security monitoring tool. Essentially, the AI ​​must be able to collect a wide range of security logs from Ubuntu servers in real time, ensuring that critical events are captured without delay. These logs include authentication logs that detect failed login attempts and potential brute force attacks, logs that track user activity and activity, and firewall logs that provide visibility into blocked or suspicious network connections. The system standardizes these logs in a standardized structure—preferably JSON—for robust and seamless analysis. This requirement ensures consistency across diverse data formats and lays the foundation for rule-based and anomaly detection.
+
+\subsection{Detection \& Analysis}
+Once the logs have been collected and normalized, AI must provide robust analysis capabilities. On one hand, it should employ rule-based detection mechanisms, where administrators define clear thresholds and conditions for generating alerts. For instance, multiple failed SSH login attempts within a short period should trigger a brute-force alert, while excessive or unusual usage of the sudo command may indicate privilege escalation. On the other hand, the system should incorporate anomaly detection techniques powered by machine learning, which allow it to identify suspicious activities that do not match predefined rules. By establishing baselines of normal system behavior, the anomaly detection component can detect deviations such as unusual login times, unexpected process executions, or connections from atypical geographic locations. Together, these dual modes of detection provide comprehensive coverage of both known and emerging threats.
+
+\subsection{Real-Time Alerting}
+Another essential functional requirement of AI is the ability to generate real-time alerts. Detection is meaningless without rapid communication of results, and therefore the system must deliver timely notifications to security analysts or administrators through configurable channels such as dashboard alerts, emails, or integration with incident management platforms.
+
+\subsection{Visualization, Search, Forensics, and Reporting}
+In addition to alerts, AI should provide simple visualization capabilities. Through user-friendly dashboards built using tools like Kibana, administrators should be able to visualize security events in graphical form. These dashboards transform complex log data into clear, actionable insights. Additionally, the system should support powerful search and query features that enable users to filter and investigate logs based on criteria such as date range, IP address, username, or event type. This functionality is critical for forensic investigations and reconstructing the sequence of events surrounding an incident. Finally, AI should support automated reporting by generating summaries in multiple formats, including PDF and CSV, for compliance audits and corporate documentation.
+
+\section{Non-Functional Requirements}
+\subsection{Performance \& Scale}
+The system must meet a set of non-functional requirements to ensure its reliability, ease of use, and long-term sustainability. Performance is a key attribute, as the system must be capable of processing large volumes of security logs at scale. The AI is expected to handle at least several logs per second on mid-range devices, while maintaining minimal latency between the occurrence of an event and its visualization on the dashboard. This performance objective ensures that the system can support both small-scale academic deployments and larger enterprise environments as it scales. Scalability is closely linked to performance. The system must be designed to support expansion, both through increased hardware and the addition of multiple devices. This requirement ensures that the AI ​​remains flexible and adaptable to organizations of varying sizes and evolving needs.
+
+\subsection{Security}
+Security itself constitutes a non-functional requirement, since the system is entrusted with sensitive log data. To this end, AI must guarantee confidentiality and integrity by employing modern encryption protocols such as TLS 1.3 for communication, and by encrypting stored log data at rest. Moreover, access must be restricted through role-based access control (RBAC), ensuring that administrators, analysts, and general users are granted permissions appropriate to their roles. System activity must also be logged internally, providing accountability and an audit trail of configuration changes, login attempts, and data access events.
+
+\subsection{Usability \& Reliability}
+Usability is another critical requirement. AI is intended to be accessible not only to experienced cybersecurity professionals but also to junior administrators and researchers. The dashboards and interfaces must therefore be designed for clarity and simplicity, supported by comprehensive documentation and training materials to minimize the learning curve. The system must also embody reliability and maintainability. Reliability requires high availability, with a target uptime of at least 99 percent, supported by redundancy and failover mechanisms. Backup and recovery procedures must be in place to ensure that logs are not lost due to hardware failures or software crashes. Maintainability is equally important, as the landscape of security threats and regulatory requirements evolves constantly. The modular design of AI facilitates updates and enhancements to individual components—such as anomaly detection algorithms or data parsers—without disrupting the entire system. Regular updates and detailed technical documentation must be provided to ensure smooth operation and continuous improvement.
+
+\subsection{Compliance}
+Finally, compliance with international and local standards such as ISO/IEC 27001 is a fundamental non-functional requirement. By aligning with these standards AI not only provides technical robustness but also supports organizations in meeting audit and certification requirements. Collectivel, these non-functional requirements ensure that AI is secure, efficient, user-friendly, reliable, and adaptable for long-term deployment in diverse environments.
+
+\section{System Modeling}
+This section presents the system models that formalize the architecture and design of AI.
+
+\subsection{Block Diagram}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/block-diagram.png}
+    \caption{System Block Diagram}
+    \label{fig:block}
+\end{figure}
+
+\subsection{Use Case Model}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/Use-Case-Diagram.png}
+    \caption{Use Case Diagram}
+    \label{fig:usecase}
+\end{figure}
+
+\subsection{DFD – Data Flow Diagrams}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/DFD-0.png}
+    \caption{Data Flow Diagram}
+    \label{fig:dfd}
+\end{figure}
+
+\section{Database type}
+In the system we use the non-relational which is Elasticsearch.
+because it is extremely fast for searching and querying logs, and it handles large volumes of unstructured data from systems and servers efficiently.
+Elasticsearch also facilitates indexing and real-time analysis, making it highly suitable for anomaly detection and cybersecurity threat analysis.
+
+
+
+    % ------------------------- الفصل 4: Design -------------------------
+\chapter{Project Design}
+
+% أضف معمارية النظام، مخططات، واجهات، قواعد بيانات…
+
+% ------------------------- الفصل 5: Implementation & Test ----------
+\chapter{Implementation and Test}
+
+% صف بيئة التطوير، أدوات SW/HW، حالات الاختبار، النتائج التجريبية…
+
+% ------------------------- الفصل 6: Results & Discussions ----------
+\chapter{Results and Discussions (if any)}
+% ناقش النتائج، التحليلات، المقارنات مع الأعمال السابقة…
+
+% ------------------------- الفصل 7: Conclusions & Recs -------------
+\chapter{Conclusions and Recommendations}
+% لخص ما تم والتوصيات المستقبلية 
+
+
+% ------------------------- المراجع -------------------------------
+\chapter{References}
+\bibliographystyle{IEEEtran} % أو plain, apa, unsrt, etc.
+\bibliography{references}
+
+    % ------------------------- الملاحق -------------------------------
+\appendix
+\chapter{Appendix A}
+% ضع أي مواد إضافية: استبيانات، شفرة، جداول مطولة…
+
+
+
+
+
+\end{document}

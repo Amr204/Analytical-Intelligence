@@ -69,7 +69,8 @@ services:
       ANALYZER_PORT: ${ANALYZER_PORT:-8000}
       # Optional override (leave empty for auto-detect)
       DEVICE_IP: ${DEVICE_IP:-}
-      FLOW_IDLE_TIMEOUT: ${FLOW_IDLE_TIMEOUT:-2}
-      FLOW_ACTIVE_TIMEOUT: ${FLOW_ACTIVE_TIMEOUT:-5}
+      # Flow timeouts for ~6s detection cadence
+      FLOW_IDLE_TIMEOUT: ${FLOW_IDLE_TIMEOUT:-6}
+      FLOW_ACTIVE_TIMEOUT: ${FLOW_ACTIVE_TIMEOUT:-6}
     volumes:
       - ./agents/common:/app/common:ro

@@ -76,6 +76,26 @@ async def ingest_auth_event(
                 details=detection["details"]
             )
             logger.info(f"SSH detection INSERTED: id={detection_id}, label={detection['label']}, score={detection['score']:.4f}, device={payload.device_id}")
+            
+            # Enqueue Telegram alert (non-blocking)
+            from app.notifications import get_notification_bus
+            bus = get_notification_bus()
+            if bus:
+                details = detection.get("details", {})
+                bus.enqueue_alert({
+                    "detection_id": detection_id,
+                    "timestamp": ts.isoformat() + "Z",
+                    "device_id": payload.device_id,
+                    "model_name": detection["model_name"],
+                    "label": detection["label"],
+                    "score": detection["score"],
+                    "severity": detection["severity"],
+                    "src_ip": details.get("src_ip"),
+                    "dst_ip": details.get("target_ip") or payload.device_ip,
+                    "dst_port": details.get("port", 22),
+                    "protocol": "SSH",
+                    "reason": details.get("reason", ""),
+                })
         else:
             logger.debug(f"SSH detection returned None for event_id={event_id}")
         

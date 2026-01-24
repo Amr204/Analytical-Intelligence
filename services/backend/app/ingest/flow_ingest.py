@@ -94,12 +94,12 @@ async def ingest_flow_event(
             existing = result.first()
             
             if existing:
-                # Update existing
+                # Update existing detection - also update ts for visibility in recent-detections
                 detection_id = existing[0]
                 new_occurrences = (existing[1] or 1) + 1
                 await session.execute(text("""
                     UPDATE detections 
-                    SET occurrences = :occurrences, last_seen = :ts
+                    SET occurrences = :occurrences, last_seen = :ts, ts = :ts
                     WHERE id = :id
                 """), {"occurrences": new_occurrences, "ts": ts, "id": detection_id})
                 logger.info(f"Network RF detection DEDUP: {label} (x{new_occurrences})")
@@ -161,6 +161,26 @@ async def ingest_flow_event(
                         proto=str(proto) if proto else None
                     )
                     logger.info(f"Network RF detection: {detection['label']} ({detection['severity']})")
+                    
+                    # Enqueue Telegram alert (non-blocking)
+                    from app.notifications import get_notification_bus
+                    bus = get_notification_bus()
+                    if bus:
+                        bus.enqueue_alert({
+                            "detection_id": detection_id,
+                            "timestamp": ts.isoformat() + "Z",
+                            "device_id": payload.device_id,
+                            "model_name": detection["model_name"],
+                            "label": detection["label"],
+                            "score": detection["score"],
+                            "severity": detection["severity"],
+                            "src_ip": str(src_ip) if src_ip else None,
+                            "dst_ip": str(dst_ip) if dst_ip else None,
+                            "src_port": int(src_port) if src_port else None,
+                            "dst_port": int(dst_port) if dst_port else None,
+                            "protocol": str(proto) if proto else None,
+                            "reason": detection.get("details", {}).get("reason", ""),
+                        })
         
         await session.commit()
 

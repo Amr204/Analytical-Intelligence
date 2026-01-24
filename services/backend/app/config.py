@@ -72,10 +72,10 @@ class Settings(BaseSettings):
     ssh_spray_username_threshold: int = 10 
 
     # Network ML
-    ml_dedup_window_seconds: int = 300
+    ml_dedup_window_seconds: int = 10  # Small window for ~6s detection cadence
     ml_min_flow_rate_pps: int = 100
     ml_min_bytes_per_second: int = 1000
-    ml_cooldown_seconds_per_src: int = 3600
+    ml_cooldown_seconds_per_src: int = 0  # Disabled by default for reliable detection
 
     # Network Label Allowlist (comma-separated)
     # Only these labels will create detection records
@@ -85,6 +85,21 @@ class Settings(BaseSettings):
     # What to do with non-allowed labels: "ignore" (skip) or "map_to_normal" (log only)
     # Recommended: "ignore" - don't store any record for Web Attacks, Bots, etc.
     network_non_allow_action: str = "ignore"
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Telegram Alerts (Optional)
+    # ─────────────────────────────────────────────────────────────────────────
+    telegram_enabled: bool = False
+    telegram_bot_token: str = ""  # MUST be set via env, never hardcoded
+    telegram_chat_id: str = "-5228638760"  # Default: Analytical Intelligence | SOC Team
+    telegram_min_severity: str = "HIGH"  # Only send alerts >= this severity
+    telegram_rate_limit_per_min: int = 20
+    telegram_dedup_window_seconds: int = 60
+    telegram_timeout_seconds: int = 10
+    telegram_parse_mode: str = "HTML"
+    telegram_disable_web_preview: bool = True
+    telegram_startup_test: bool = False  # Send test message on startup
+    public_dashboard_base_url: str = ""  # Optional: for dashboard links in alerts
 
     @property
     def network_label_allowlist_set(self) -> Set[str]:

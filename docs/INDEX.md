@@ -34,8 +34,10 @@ Updating the system?  → UPGRADES.md
 | [UPGRADES.md](UPGRADES.md) | How to update the system safely | Operators |
 | [ML.md](ML.md) | ML models, thresholds, allowlist policy | Developers |
 | [SECURITY.md](SECURITY.md) | Firewall modes, API keys, hardening | Security admins |
+| [TELEGRAM.md](TELEGRAM.md) | Telegram alerting integration & setup | Operators |
 | [GIT_WORKFLOW.md](GIT_WORKFLOW.md) | Git best practices & standard workflow | Developers |
 | [TESTING.md](TESTING.md) | Network RF pipeline validation guide | Developers |
+| [REPORTS.md](REPORTS.md) | Reports generation & analysis | Developers |
 
 ---
 
@@ -92,6 +94,12 @@ Comprehensive runbook covering:
 - Commit message standards
 - Handling large model files (`.joblib`)
 - Safe deployment practices
+
+### [TESTING.md](TESTING.md)
+- Network RF pipeline validation guide
+
+### [REPORTS.md](REPORTS.md)
+- Reports generation & analysis
 
 
 ---

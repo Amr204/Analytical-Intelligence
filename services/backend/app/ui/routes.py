@@ -212,6 +212,22 @@ async def api_device_detail(
         return {"error": "Device not found"}
     return data
 
+@router.get("/api/v1/health/models")
+async def api_health_models():
+    """
+    Get ML models health status and detector counters.
+    
+    Returns:
+        - models: Status of all loaded models (ssh_lstm, network_ml)
+        - network_ml_detector: Health info including counters and filter flags
+    """
+    from app.detectors.network_ml_detector import get_network_ml_health
+    
+    return {
+        "models": get_models_status(),
+        "network_ml_detector": get_network_ml_health(),
+    }
+
 
 # =====================================================
 # REPORTS PAGE

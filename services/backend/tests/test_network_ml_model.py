@@ -465,5 +465,263 @@ class TestAllowlistFiltering:
         assert "Brute Force" in allowed
 
 
+class TestLabelNormalization:
+    """Tests for label normalization function."""
+    
+    def test_normalize_portscan_variants(self):
+        """Test that PortScan variants are normalized."""
+        from app.detectors.network_ml_detector import normalize_label
+        
+        assert normalize_label("PortScan") == "Port Scanning"
+        assert normalize_label("portscans") == "Port Scanning"
+        assert normalize_label("Port Scans") == "Port Scanning"
+        assert normalize_label("Port Scanning") == "Port Scanning"
+    
+    def test_normalize_bruteforce_variants(self):
+        """Test that BruteForce variants are normalized."""
+        from app.detectors.network_ml_detector import normalize_label
+        
+        assert normalize_label("BruteForce") == "Brute Force"
+        assert normalize_label("bruteforce") == "Brute Force"
+        assert normalize_label("Brute-Force") == "Brute Force"
+        assert normalize_label("Brute Force") == "Brute Force"
+    
+    def test_normalize_ddos_variants(self):
+        """Test that DDoS case variants are normalized."""
+        from app.detectors.network_ml_detector import normalize_label
+        
+        assert normalize_label("DDOS") == "DDoS"
+        assert normalize_label("ddos") == "DDoS"
+        assert normalize_label("DDoS") == "DDoS"
+    
+    def test_normalize_dos_variants(self):
+        """Test that DoS case variants are normalized."""
+        from app.detectors.network_ml_detector import normalize_label
+        
+        assert normalize_label("DOS") == "DoS"
+        assert normalize_label("dos") == "DoS"
+        assert normalize_label("DoS") == "DoS"
+    
+    def test_normalize_unknown_label_passthrough(self):
+        """Test that unknown labels pass through unchanged (except stripping)."""
+        from app.detectors.network_ml_detector import normalize_label
+        
+        assert normalize_label("  Normal Traffic  ") == "Normal Traffic"
+        assert normalize_label("Bots") == "Bots"
+        assert normalize_label("Web Attacks") == "Web Attacks"
+    
+    def test_normalize_empty_label(self):
+        """Test that empty or None labels return empty string."""
+        from app.detectors.network_ml_detector import normalize_label
+        
+        assert normalize_label("") == ""
+        assert normalize_label("   ") == ""
+
+
+class TestSafeClassToLabel:
+    """Tests for _safe_class_to_label helper function."""
+    
+    def test_safe_class_with_string_classes(self):
+        """Test safe mapping when model.classes_ are strings."""
+        from app.detectors.network_ml_detector import _safe_class_to_label
+        from app.models_loader import network_ml_model
+        from unittest.mock import MagicMock
+        
+        # Save original state
+        orig_loaded = network_ml_model.loaded
+        orig_model = network_ml_model.model
+        
+        try:
+            # Mock model with STRING classes
+            mock_model = MagicMock()
+            mock_model.classes_ = ["Normal Traffic", "DoS", "DDoS", "Port Scanning"]
+            network_ml_model.model = mock_model
+            network_ml_model.loaded = True
+            
+            assert _safe_class_to_label(0) == "Normal Traffic"
+            assert _safe_class_to_label(1) == "DoS"
+            assert _safe_class_to_label(2) == "DDoS"
+            assert _safe_class_to_label(3) == "Port Scanning"
+        finally:
+            network_ml_model.loaded = orig_loaded
+            network_ml_model.model = orig_model
+    
+    def test_safe_class_with_numeric_classes(self):
+        """Test safe mapping when model.classes_ are numeric."""
+        from app.detectors.network_ml_detector import _safe_class_to_label
+        from app.models_loader import network_ml_model
+        from unittest.mock import MagicMock
+        import numpy as np
+        
+        # Save original state
+        orig_loaded = network_ml_model.loaded
+        orig_model = network_ml_model.model
+        orig_inverse = network_ml_model.inverse_label_map
+        
+        try:
+            # Mock model with NUMERIC classes
+            mock_model = MagicMock()
+            mock_model.classes_ = np.array([0, 1, 2, 3])
+            network_ml_model.model = mock_model
+            network_ml_model.loaded = True
+            network_ml_model.inverse_label_map = {
+                0: "Normal Traffic",
+                1: "DoS",
+                2: "DDoS", 
+                3: "Port Scanning"
+            }
+            
+            assert _safe_class_to_label(0) == "Normal Traffic"
+            assert _safe_class_to_label(1) == "DoS"
+            assert _safe_class_to_label(2) == "DDoS"
+            assert _safe_class_to_label(3) == "Port Scanning"
+        finally:
+            network_ml_model.loaded = orig_loaded
+            network_ml_model.model = orig_model
+            network_ml_model.inverse_label_map = orig_inverse
+    
+    def test_safe_class_out_of_range(self):
+        """Test that out-of-range indices return string of index."""
+        from app.detectors.network_ml_detector import _safe_class_to_label
+        from app.models_loader import network_ml_model
+        from unittest.mock import MagicMock
+        
+        orig_loaded = network_ml_model.loaded
+        orig_model = network_ml_model.model
+        
+        try:
+            mock_model = MagicMock()
+            mock_model.classes_ = ["A", "B"]
+            network_ml_model.model = mock_model
+            network_ml_model.loaded = True
+            
+            # Index 10 is out of range, should return "10"
+            assert _safe_class_to_label(10) == "10"
+        finally:
+            network_ml_model.loaded = orig_loaded
+            network_ml_model.model = orig_model
+    
+    def test_safe_class_no_classes_attribute(self):
+        """Test fallback when model has no classes_ attribute."""
+        from app.detectors.network_ml_detector import _safe_class_to_label
+        from app.models_loader import network_ml_model
+        from unittest.mock import MagicMock
+        
+        orig_loaded = network_ml_model.loaded
+        orig_model = network_ml_model.model
+        orig_inverse = network_ml_model.inverse_label_map
+        
+        try:
+            mock_model = MagicMock(spec=[])  # No classes_ attribute
+            network_ml_model.model = mock_model
+            network_ml_model.loaded = True
+            network_ml_model.inverse_label_map = {0: "Normal", 1: "Attack"}
+            
+            assert _safe_class_to_label(0) == "Normal"
+            assert _safe_class_to_label(1) == "Attack"
+        finally:
+            network_ml_model.loaded = orig_loaded
+            network_ml_model.model = orig_model
+            network_ml_model.inverse_label_map = orig_inverse
+
+
+class TestAnalyzeFlowDebugMode:
+    """Tests for analyze_flow with debug mode enabled."""
+    
+    def test_analyze_flow_no_crash_with_string_classes_debug_on(self):
+        """Test that analyze_flow doesn't crash when debug is ON and model.classes_ are strings."""
+        import os
+        
+        # Enable debug mode
+        os.environ["NETWORK_ML_DEBUG"] = "1"
+        os.environ["NETWORK_ML_DEBUG_SAMPLE_RATE"] = "1"
+        
+        # Reload module to pick up env vars
+        import importlib
+        import app.detectors.network_ml_detector as detector
+        importlib.reload(detector)
+        
+        from app.models_loader import network_ml_model
+        from unittest.mock import MagicMock
+        import numpy as np
+        
+        orig_loaded = network_ml_model.loaded
+        orig_model = network_ml_model.model
+        orig_feature_list = network_ml_model.feature_list
+        orig_label_map = network_ml_model.label_map
+        
+        try:
+            # Mock model with STRING classes (the bug scenario)
+            mock_model = MagicMock()
+            mock_model.predict_proba.return_value = np.array([[0.1, 0.8, 0.05, 0.05]])
+            mock_model.classes_ = np.array(["Normal Traffic", "DDoS", "DoS", "Port Scanning"])
+            network_ml_model.model = mock_model
+            network_ml_model.loaded = True
+            network_ml_model.feature_list = ["feat1", "feat2", "feat3"]
+            network_ml_model.label_map = {
+                "Normal Traffic": 0,
+                "DDoS": 1,
+                "DoS": 2,
+                "Port Scanning": 3
+            }
+            
+            flow_data = {
+                "src_ip": "192.168.1.100",
+                "dst_ip": "10.0.0.1",
+                "src_port": 54321,
+                "dst_port": 80,
+                "protocol": "TCP",
+                "bidirectional_duration_ms": 1000,
+                "bidirectional_packets": 100,
+                "bidirectional_bytes": 10000,
+            }
+            
+            # This should NOT crash even with string classes_ and debug ON
+            # The old code would crash with int("DDoS")
+            result = detector.analyze_flow(flow_data)
+            
+            # We expect a detection (DDoS with 0.8 prob)
+            # May still be None due to feature mapping, but should NOT crash
+            # The key test is: no exception raised
+            
+        finally:
+            network_ml_model.loaded = orig_loaded
+            network_ml_model.model = orig_model
+            network_ml_model.feature_list = orig_feature_list
+            network_ml_model.label_map = orig_label_map
+            os.environ["NETWORK_ML_DEBUG"] = "0"
+
+
+class TestGetNetworkMlHealth:
+    """Tests for get_network_ml_health function."""
+    
+    def test_health_returns_expected_keys(self):
+        """Test that health function returns all expected keys."""
+        from app.detectors.network_ml_detector import get_network_ml_health
+        
+        health = get_network_ml_health()
+        
+        assert "loaded" in health
+        assert "features_count" in health
+        assert "labels_count" in health
+        assert "benign_label" in health
+        assert "allowed_labels" in health
+        assert "thresholds" in health
+        assert "filters" in health
+        assert "counters" in health
+        
+        # Check nested structure
+        assert "global" in health["thresholds"]
+        assert "per_label" in health["thresholds"]
+        
+        assert "strict_filters" in health["filters"]
+        assert "disable_gating" in health["filters"]
+        assert "disable_allowlist" in health["filters"]
+        
+        assert "total_flows_seen" in health["counters"]
+        assert "detections_created" in health["counters"]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+

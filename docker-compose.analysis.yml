@@ -59,14 +59,38 @@ services:
       # Backend host binds to all interfaces
       BACKEND_HOST: "0.0.0.0"
       BACKEND_PORT: "8000"
-      NETWORK_ML_THRESHOLD: "0.95"
       # Model paths (inside container) - RF model
       SSH_MODEL_PATH: /app/models/ssh/ssh_lstm.joblib
       NETWORK_MODEL_PATH: /app/models/RF/random_forest.joblib
       NETWORK_FEATURES_PATH: /app/models/RF/feature_list.json
       NETWORK_LABELS_PATH: /app/models/RF/label_map.json
       NETWORK_PREPROCESS_PATH: /app/models/RF/preprocess_config.json
+      # ─────────────────────────────────────────────────────────────────────
+      # Network ML Tuning for Reliable Detection
+      # ─────────────────────────────────────────────────────────────────────
+      NETWORK_ML_THRESHOLD: "0.60"
+      NETWORK_ML_DISABLE_GATING: "1"
+      NETWORK_ML_DISABLE_KNOWN_LABEL_CHECK: "1"
+      NETWORK_ML_LABEL_THRESHOLDS_JSON: '{"DoS":0.55,"DDoS":0.60,"Port Scanning":0.50,"Brute Force":0.60}'
+      NETWORK_ML_DEBUG: "0"
+      NETWORK_ML_DEBUG_SAMPLE_RATE: "50"
+      # Dedup/cooldown for ~6s detection cadence
+      ML_DEDUP_WINDOW_SECONDS: "10"
+      ML_COOLDOWN_SECONDS_PER_SRC: "0"
+      # ─────────────────────────────────────────────────────────────────────
+      # Telegram Alerts (Optional) - Safe defaults, disabled unless configured
+      # ─────────────────────────────────────────────────────────────────────
+      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:--5228638760}
+      TELEGRAM_MIN_SEVERITY: ${TELEGRAM_MIN_SEVERITY:-HIGH}
+      TELEGRAM_RATE_LIMIT_PER_MIN: ${TELEGRAM_RATE_LIMIT_PER_MIN:-20}
+      TELEGRAM_DEDUP_WINDOW_SECONDS: ${TELEGRAM_DEDUP_WINDOW_SECONDS:-60}
+      TELEGRAM_TIMEOUT_SECONDS: ${TELEGRAM_TIMEOUT_SECONDS:-10}
+      TELEGRAM_STARTUP_TEST: ${TELEGRAM_STARTUP_TEST:-false}
+      PUBLIC_DASHBOARD_BASE_URL: ${PUBLIC_DASHBOARD_BASE_URL:-}
     volumes:
+      - ./models:/app/models:ro
       - ./models/ssh:/app/models/ssh:ro
       - ./models/RF:/app/models/RF:ro
     ports:

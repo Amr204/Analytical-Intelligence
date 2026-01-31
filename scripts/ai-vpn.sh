@@ -205,10 +205,10 @@ main() {
 
   echo
   echo "🧰 Commands:"
-  echo "  🛑 sudo ./ai-vpn.sh stop"
-  echo "  🔄 sudo ./ai-vpn.sh restart"
-  echo "  📊 sudo ./ai-vpn.sh status"
-  echo "  🧾 sudo ./ai-vpn.sh logs"
+  echo "  🛑 sudo ./scripts/ai-vpn.sh stop"
+  echo "  🔄 sudo ./scripts/ai-vpn.sh restart"
+  echo "  📊 sudo ./scripts/ai-vpn.sh status"
+  echo "  🧾 sudo ./scripts/ai-vpn.sh logs"
 }
 
 main "$@"

@@ -135,6 +135,7 @@ class NetworkMLModel:
         self.columns_to_clip: List[str] = []
         self.metrics: Dict[str, Any] = {}
         self.loaded: bool = False
+        self.load_error: Optional[str] = None
 
         # Benign label for RF model (string label)
         self.benign_label: str = "Normal Traffic"
@@ -227,6 +228,7 @@ class NetworkMLModel:
             logger.error(f"Failed to load Network RF model: {e}")
             self.model = None
             self.loaded = False
+            self.load_error = str(e)
             return False
     
     def predict(self, features: np.ndarray) -> Tuple[str, float, np.ndarray]:
@@ -397,5 +399,6 @@ def get_models_status() -> Dict[str, Any]:
             "labels_count": len(network_ml_model.label_map) if network_ml_model.loaded else 0,
             "benign_label": network_ml_model.benign_label,
             "metrics": network_ml_model.metrics if network_ml_model.loaded else {},
+            "error": network_ml_model.load_error,
         }
     }

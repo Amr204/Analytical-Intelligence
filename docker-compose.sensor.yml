@@ -1,4 +1,3 @@
-
 # =============================================================================
 # Analytical-Intelligence v1 - Sensor Server Stack
 # Runs on the sensor machine 
@@ -25,6 +24,7 @@ services:
     build:
       context: ./agents/auth_collector
       dockerfile: Dockerfile
+      network: host
     container_name: ai_db-auth-collector
     restart: unless-stopped
     network_mode: host
@@ -50,6 +50,7 @@ services:
     build:
       context: ./agents/flow_collector
       dockerfile: Dockerfile
+      network: host
     container_name: ai_db-flow-collector
     restart: unless-stopped
     network_mode: host

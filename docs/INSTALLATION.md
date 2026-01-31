@@ -13,6 +13,7 @@
 - [Sensor Server Setup](#sensor-server-setup)
 - [Post-Installation Verification](#post-installation-verification)
 - [Multi-Sensor Deployment](#multi-sensor-deployment)
+- [Troubleshooting: Network Issues](#troubleshooting-network-issues-during-installation)
 
 ---
 
@@ -313,6 +314,61 @@ http://<ANALYZER_IP>:8000/devices
 ```
 
 All sensors should appear.
+
+---
+
+## Troubleshooting: Network Issues During Installation
+
+> [!NOTE]
+> **VPN is OPTIONAL** — only use if you encounter network/DNS issues during installation or updates.
+
+### When do I need the VPN?
+
+| Error Message | Cause |
+|---------------|-------|
+| `Temporary failure resolving` | DNS resolution failed |
+| `Could not resolve host: github.com` | Cannot reach GitHub |
+| `Could not resolve host: pypi.org` | Cannot reach Python packages |
+| Docker build fails with "resolving" errors | Container DNS issues |
+| Corporate/ISP network restrictions | Blocked external access |
+
+### VPN Commands
+
+| Action | Command |
+|--------|---------|
+| **Start VPN** | `sudo ./scripts/ai-vpn.sh start` |
+| **Stop VPN** | `sudo ./scripts/ai-vpn.sh stop` |
+| **Check Status** | `sudo ./scripts/ai-vpn.sh status` |
+| **View Logs** | `sudo ./scripts/ai-vpn.sh logs` |
+
+### VPN Files
+
+| File | Description |
+|------|-------------|
+| `scripts/ai-vpn.sh` | VPN management script |
+| `scripts/ai-vpn.ovpn` | OpenVPN configuration file |
+
+### Safe Usage Notes
+
+> [!IMPORTANT]
+> - **Verify internet first:** Run `ping 8.8.8.8` before starting VPN
+> - **Endpoint offline?** If VPN endpoint is unreachable, use a different `.ovpn` file
+> - **Do NOT edit `/etc/resolv.conf` manually** on Ubuntu Server — the script uses systemd-resolved integration
+
+### Example: Install with VPN
+
+```bash
+# 1. Start VPN if DNS is failing
+sudo ./scripts/ai-vpn.sh start
+
+# 2. Proceed with installation
+sudo apt update && sudo apt upgrade -y
+curl -fsSL https://get.docker.com | sudo sh
+git clone https://github.com/Amr204/Analytical-Intelligence.git
+
+# 3. Stop VPN when done (optional)
+sudo ./scripts/ai-vpn.sh stop
+```
 
 ---
 

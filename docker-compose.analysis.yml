@@ -31,7 +31,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -39,13 +39,14 @@ services:
       - ai-network
     # PostgreSQL is NOT exposed externally - only backend can access it
 
-  # ─────────────────────────────────────────────────────────────────────────
-  # Backend API + UI (FastAPI)
-  # ─────────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
+    # Backend API + UI (FastAPI)
+    # ─────────────────────────────────────────────────────────────────────────
   backend:
     build:
       context: ./services/backend
       dockerfile: Dockerfile
+      network: host
     container_name: ai_db-backend
     restart: unless-stopped
     depends_on:

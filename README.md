@@ -1,4 +1,4 @@
-# 🛡️ Analytical-Intelligence - Security Event Management System
+# 🛡️ Analytical-Intelligence v1 - Security Event Management System
 
 > A lightweight SIEM for real-time attack detection using Machine Learning
 
@@ -92,18 +92,18 @@ A real-time security threat detection system using:
 
 | Field | Value |
 |-------|-------|
-| Your name | `ubuntu-analyze` |
+| Your name | `analyzer` |
 | Your server's name | `ubuntu-analyzer` |
-| Pick a username | `ubuntu-analyze` |
+| Pick a username | `analyzer` |
 | Choose a password | `analyzer` |
 
 **For Sensor (Sensor Server):**
 
 | Field | Value |
 |-------|-------|
-| Your name | `ubuntu-server` |
+| Your name | `server` |
 | Your server's name | `ubuntu-server` |
-| Pick a username | `ubuntu-server` |
+| Pick a username | `server` |
 | Choose a password | `server` |
 
 3. **Enable OpenSSH** during installation ✓
@@ -841,6 +841,8 @@ git pull
 docker compose -f docker-compose.analysis.yml up -d --build
 ```
 
+> **Tip:** If you encounter DNS errors during `git pull` or `docker build`, see [Optional VPN for Updates](#-optional-vpn-for-updates).
+
 ### Scenario 3: Stop System
 
 **On Analysis server:**
@@ -991,7 +993,64 @@ Includes:
 | Sensor doesn't connect | Check `ANALYZER_HOST` in `.env` |
 | No alerts | Lower `NETWORK_ML_THRESHOLD=0.50` |
 | Container doesn't start | `docker compose logs backend` |
-| DNS fails during build | `bash scripts/docker_doctor.sh` |
+| DNS fails during build | `bash scripts/docker_doctor.sh` or [use VPN](#-optional-vpn-for-updates) |
+
+---
+
+### 🔐 Optional VPN for Updates
+
+> **This step is OPTIONAL** — only use when you encounter network/DNS issues during updates or installations.
+
+#### When do I need the VPN?
+
+Use the VPN if you see any of these errors:
+
+| Error Message | Cause |
+|---------------|-------|
+| `Temporary failure resolving` | DNS resolution failed |
+| `Could not resolve host: github.com` | Cannot reach GitHub |
+| `Could not resolve host: pypi.org` | Cannot reach Python packages |
+| Docker build fails with "resolving" errors | Container DNS issues |
+| Corporate/ISP network restrictions | Blocked external access |
+
+#### VPN Commands
+
+| Action | Command |
+|--------|---------|
+| **Permissions** | `sudo chmod +x scripts/ai-vpn.sh` |
+| **Start VPN** | `sudo ./scripts/ai-vpn.sh start` |
+| **Stop VPN** | `sudo ./scripts/ai-vpn.sh stop` |
+| **Check Status** | `sudo ./scripts/ai-vpn.sh status` |
+| **View Logs** | `sudo ./scripts/ai-vpn.sh logs` |
+
+#### VPN Files
+
+| File | Description |
+|------|-------------|
+| `scripts/ai-vpn.sh` | VPN management script |
+| `scripts/ai-vpn.ovpn` | OpenVPN configuration file |
+
+#### Safe Usage Notes
+
+> [!IMPORTANT]
+> - **Verify internet first:** Run `ping 8.8.8.8` before starting VPN
+> - **Endpoint offline?** If VPN endpoint is unreachable, use a different `.ovpn` file
+> - **Do NOT edit `/etc/resolv.conf` manually** on Ubuntu Server — the script uses systemd-resolved integration
+
+#### Example: Update with VPN
+
+```bash
+# 1. Start VPN if DNS is failing
+sudo ./scripts/ai-vpn.sh start
+
+# 2. Proceed with update
+cd ~/Analytical-Intelligence
+git pull
+docker compose -f docker-compose.analysis.yml up -d --build
+
+# 3. Stop VPN when done (optional)
+sudo ./scripts/ai-vpn.sh stop
+```
 
 ---
 

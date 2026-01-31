@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # pydantic-settings v2 style (still reads .env)
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
     # Database
     database_url: str = "postgresql+asyncpg://ai:ai2025@postgres:5432/ai_db"

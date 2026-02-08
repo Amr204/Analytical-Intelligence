@@ -77,7 +77,7 @@ alert http any any -> $HOME_NET any ( \
 )
 
 # ==========================================================================
-# PORT SCAN INDICATORS
+# PORT SCAN INDICATORS (Advanced)
 # ==========================================================================
 # Detect reconnaissance behavior (scanning for open ports)
 
@@ -109,29 +109,53 @@ alert udp any any -> $HOME_NET any ( \
     sid:1000012; rev:1; \
 )
 
-# Nmap-specific scan types
+# Nmap-specific scan types (Reconnaissance)
 alert tcp any any -> $HOME_NET any ( \
-    msg:"AI PortScan: Nmap XMAS scan"; \
+    msg:"AI PortScan: Nmap XMAS scan (FPU flags set)"; \
     flags:FPU; \
+    flow:to_server; \
     classtype:attempted-recon; \
     priority:2; \
     sid:1000013; rev:1; \
 )
 
 alert tcp any any -> $HOME_NET any ( \
-    msg:"AI PortScan: Nmap NULL scan"; \
+    msg:"AI PortScan: Nmap NULL scan (No flags set)"; \
     flags:0; \
+    flow:to_server; \
     classtype:attempted-recon; \
     priority:2; \
     sid:1000014; rev:1; \
 )
 
 alert tcp any any -> $HOME_NET any ( \
-    msg:"AI PortScan: Nmap FIN scan"; \
+    msg:"AI PortScan: Nmap FIN scan (FIN flag only)"; \
     flags:F; \
+    flow:to_server; \
     classtype:attempted-recon; \
     priority:2; \
     sid:1000015; rev:1; \
+)
+
+# Advanced Recon: Nmap Scripting Engine (NSE) Detection
+alert http any any -> $HOME_NET any ( \
+    msg:"AI Recon: Nmap Scripting Engine (NSE) User-Agent"; \
+    flow:to_server,established; \
+    http.user_agent; \
+    content:"Nmap Scripting Engine"; nocase; \
+    classtype:attempted-recon; \
+    priority:2; \
+    sid:1000016; rev:1; \
+)
+
+alert http any any -> $HOME_NET any ( \
+    msg:"AI Recon: Nikto Vulnerability Scanner"; \
+    flow:to_server,established; \
+    http.user_agent; \
+    content:"Nikto"; nocase; \
+    classtype:attempted-recon; \
+    priority:2; \
+    sid:1000017; rev:1; \
 )
 
 # ==========================================================================
@@ -221,11 +245,12 @@ alert tcp any any -> $HOME_NET 21 ( \
 )
 
 # ==========================================================================
-# WEB ATTACK INDICATORS
+# WEB ATTACK INDICATORS (Deep)
 # ==========================================================================
 
 alert http any any -> $HOME_NET any ( \
     msg:"AI WebAttack: SQL Injection attempt (UNION SELECT)"; \
+    flow:to_server,established; \
     http.uri; \
     content:"UNION"; nocase; \
     content:"SELECT"; nocase; distance:0; \
@@ -235,7 +260,8 @@ alert http any any -> $HOME_NET any ( \
 )
 
 alert http any any -> $HOME_NET any ( \
-    msg:"AI WebAttack: SQL Injection attempt (OR 1=1)"; \
+    msg:"AI WebAttack: SQL Injection attempt (OR 1=1 Logic)"; \
+    flow:to_server,established; \
     http.uri; \
     content:"OR"; nocase; \
     content:"1=1"; distance:0; within:10; \
@@ -245,7 +271,19 @@ alert http any any -> $HOME_NET any ( \
 )
 
 alert http any any -> $HOME_NET any ( \
+    msg:"AI WebAttack: SQL Injection attempt (Probe/Benchmark)"; \
+    flow:to_server,established; \
+    http.uri; \
+    content:"benchmark"; nocase; \
+    content:"("; distance:0; \
+    classtype:web-application-attack; \
+    priority:2; \
+    sid:1000046; rev:1; \
+)
+
+alert http any any -> $HOME_NET any ( \
     msg:"AI WebAttack: XSS attempt (script tag)"; \
+    flow:to_server,established; \
     http.uri; \
     content:"<script"; nocase; \
     classtype:web-application-attack; \
@@ -254,7 +292,18 @@ alert http any any -> $HOME_NET any ( \
 )
 
 alert http any any -> $HOME_NET any ( \
-    msg:"AI WebAttack: Path traversal attempt"; \
+    msg:"AI WebAttack: XSS attempt (javascript protocol)"; \
+    flow:to_server,established; \
+    http.uri; \
+    content:"javascript:"; nocase; \
+    classtype:web-application-attack; \
+    priority:2; \
+    sid:1000045; rev:1; \
+)
+
+alert http any any -> $HOME_NET any ( \
+    msg:"AI WebAttack: Path traversal attempt (../)"; \
+    flow:to_server,established; \
     http.uri; \
     content:"../"; \
     classtype:web-application-attack; \
@@ -264,6 +313,7 @@ alert http any any -> $HOME_NET any ( \
 
 alert http any any -> $HOME_NET any ( \
     msg:"AI WebAttack: LFI /etc/passwd attempt"; \
+    flow:to_server,established; \
     http.uri; \
     content:"/etc/passwd"; nocase; \
     classtype:web-application-attack; \
@@ -271,55 +321,115 @@ alert http any any -> $HOME_NET any ( \
     sid:1000044; rev:1; \
 )
 
+alert http any any -> $HOME_NET any ( \
+    msg:"AI WebAttack: LFI php://input Wrapper"; \
+    flow:to_server,established; \
+    http.uri; \
+    content:"php://input"; nocase; \
+    classtype:web-application-attack; \
+    priority:2; \
+    sid:1000047; rev:1; \
+)
+
 # ==========================================================================
-# SUSPICIOUS USER AGENTS
+# COMMAND INJECTION & RCE (Professional Detection)
 # ==========================================================================
+# Detects malicious commands executed via web exploits or backdoors.
+# Low FP focus: Checks for command Chaining/Pipes or specific binaries in URIs.
 
 alert http any any -> $HOME_NET any ( \
-    msg:"AI Suspicious: Nmap User-Agent detected"; \
-    http.user_agent; \
-    content:"Nmap"; nocase; \
-    classtype:attempted-recon; \
-    priority:2; \
+    msg:"AI RCE: Command Injection (Attempt to download external file)"; \
+    flow:to_server,established; \
+    http.uri; \
+    content:"wget "; nocase; \
+    pcre:"/wget\s+http/i"; \
+    classtype:web-application-attack; \
+    priority:1; \
     sid:1000050; rev:1; \
 )
 
 alert http any any -> $HOME_NET any ( \
-    msg:"AI Suspicious: Masscan User-Agent detected"; \
-    http.user_agent; \
-    content:"masscan"; nocase; \
-    classtype:attempted-recon; \
-    priority:2; \
+    msg:"AI RCE: Command Injection (Attempt to curl external file)"; \
+    flow:to_server,established; \
+    http.uri; \
+    content:"curl "; nocase; \
+    pcre:"/curl\s+http/i"; \
+    classtype:web-application-attack; \
+    priority:1; \
     sid:1000051; rev:1; \
 )
 
 alert http any any -> $HOME_NET any ( \
-    msg:"AI Suspicious: sqlmap User-Agent detected"; \
-    http.user_agent; \
-    content:"sqlmap"; nocase; \
-    classtype:web-application-attack; \
+    msg:"AI RCE: Linux Binary Execution Attempt (/bin/sh)"; \
+    flow:to_server,established; \
+    http.uri; \
+    content:"/bin/sh"; nocase; \
+    classtype:system-call-detect; \
     priority:1; \
     sid:1000052; rev:1; \
 )
 
+alert http any any -> $HOME_NET any ( \
+    msg:"AI RCE: Linux Binary Execution Attempt (/bin/bash)"; \
+    flow:to_server,established; \
+    http.uri; \
+    content:"/bin/bash"; nocase; \
+    classtype:system-call-detect; \
+    priority:1; \
+    sid:1000053; rev:1; \
+)
+
+alert http any any -> $HOME_NET any ( \
+    msg:"AI RCE: Suspicious permission change (chmod +x)"; \
+    flow:to_server,established; \
+    http.uri; \
+    content:"chmod"; nocase; \
+    content:"+x"; distance:0; within:10; \
+    classtype:web-application-attack; \
+    priority:2; \
+    sid:1000054; rev:1; \
+)
+
+alert http any any -> $HOME_NET any ( \
+    msg:"AI RCE: Suspicious Command Chaining (Pipe/Redirect)"; \
+    flow:to_server,established; \
+    http.uri; \
+    pcre:"/(;|\||&&)\s*(nc|bash|sh|python|perl|ruby)\s+/i"; \
+    classtype:web-application-attack; \
+    priority:1; \
+    sid:1000055; rev:1; \
+)
+
 # ==========================================================================
-# CRYPTO MINING INDICATORS
+# MALWARE & REVERSE SHELL INDICATORS (Post-Exploitation)
 # ==========================================================================
 
-alert tcp $HOME_NET any -> any any ( \
-    msg:"AI CryptoMiner: Stratum protocol detected"; \
-    content:"mining.subscribe"; nocase; \
+alert tcp $HOME_NET any -> $EXTERNAL_NET any ( \
+    msg:"AI Malware: Potential Reverse Shell Prompt (root@)"; \
+    flow:from_server,established; \
+    content:"root@"; depth:10; \
+    content:"#"; distance:0; within:50; \
     classtype:trojan-activity; \
-    priority:2; \
+    priority:1; \
     sid:1000060; rev:1; \
 )
 
-alert tcp $HOME_NET any -> any any ( \
-    msg:"AI CryptoMiner: XMRig/Monero pattern"; \
-    content:"login"; \
-    content:"pass"; distance:0; within:50; \
-    content:"agent"; distance:0; within:50; \
+alert tcp $HOME_NET any -> $EXTERNAL_NET any ( \
+    msg:"AI Malware: Potential Reverse Shell (id command output)"; \
+    flow:from_server,established; \
+    content:"uid="; depth:10; \
+    content:"gid="; distance:0; within:20; \
+    content:"groups="; distance:0; within:20; \
     classtype:trojan-activity; \
-    priority:2; \
+    priority:1; \
     sid:1000061; rev:1; \
+)
+
+alert tcp $HOME_NET any -> $EXTERNAL_NET any ( \
+    msg:"AI Malware: Suspicious cleartext password file read"; \
+    flow:from_server,established; \
+    content:"root:x:0:0:"; \
+    classtype:policy-violation; \
+    priority:1; \
+    sid:1000062; rev:1; \
 )

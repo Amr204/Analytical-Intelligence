@@ -41,6 +41,29 @@
 \usepackage{comment}
 \usepackage{amssymb}              % للرموز الرياضية مثل \checkmark
 
+% --- FIX: Make Bibliography a Section (no page break) & Rename to References ---
+\makeatletter
+\renewenvironment{thebibliography}[1]
+{\section*{\bibname}%
+	\@mkboth{\MakeUppercase\bibname}{\MakeUppercase\bibname}%
+	\list{\@biblabel{\@arabic\c@enumiv}}%
+	{\settowidth\labelwidth{\@biblabel{#1}}%
+		\leftmargin\labelwidth
+		\advance\leftmargin\labelsep
+		\@openbib@code
+		\usecounter{enumiv}%
+		\let\p@enumiv\@empty
+		\renewcommand\theenumiv{\@arabic\c@enumiv}}%
+	\sloppy
+	\clubpenalty4000
+	\@clubpenalty \clubpenalty
+	\widowpenalty4000%
+	\sfcode`\.\@m}
+{\def\@noitemerr
+	{\@latex@warning{Empty `thebibliography' environment}}%
+	\endlist}
+\makeatother
+
 % ------------------------- Code Listings -------------------------
 \usepackage{xcolor}
 \usepackage{listings}
@@ -519,9 +542,7 @@ This report is divided into  chapters, each one will focus on a part of the proj
     \item \textbf{Chapter 3:} Describes the architecture, components of the system, and project models.
     \item \textbf{Chapter 4:} Explains the design of the system, how it works, and some project codes.
     \item \textbf{Chapter 5:} Details the implementation process and which tools are used.
-    \item \textbf{Chapter 6:} Summarizes the results and discussions.
-    \item \textbf{Chapter 7:} Conclusion and suggests improvements and potential future recommendations.
-    \item \textbf{Chapter 8:} References of the project.
+    \item \textbf{Chapter 6:} Conclusion and suggests improvements and potential future recommendations.
 \end{itemize}
 
 % ------------------------- الفصل 2: Background & LR ----------------
@@ -631,7 +652,7 @@ This review also discusses the similarities between the various literatures and 
 Finally, it highlights the research gap we seek to address through our project.
 
 \subsection{Zero-Day Exploit Detection in Network Flows}
-According to \cite{Toure2024}, a hybrid framework combining supervised classification,
+According to Touré et al. \cite{Toure2024}, a hybrid framework combining supervised classification,
 unsupervised clustering, and online learning was proposed to detect zero-day attacks.
 
 Using datasets such as IBM and NSL-KDD, the system achieved high accuracy in identifying zero-day vulnerabilities, while minimizing false positives.
@@ -639,14 +660,14 @@ Using datasets such as IBM and NSL-KDD, the system achieved high accuracy in ide
 This study emphasizes the need to integrate diverse learning approaches, but also highlights challenges related to computational complexity and feature engineering.
 
 \subsection{Optimized Deep Isolation Forest (ODIF)}
-Galka (2025) presents ODIF, an improved version of Deep Isolation Forest, which reduces computational costs and memory usage while maintaining anomaly detection accuracy.
+Gałka \cite{Galka2025} presents ODIF, an improved version of Deep Isolation Forest, which reduces computational costs and memory usage while maintaining anomaly detection accuracy.
 
 By simplifying data representation and eliminating duplicate processing, ODIF facilitates isolation-based anomaly detection in large-scale or resource-constrained environments.
 
 This work demonstrates how efficiency improvements can enhance the applicability of AI methods in cybersecurity, but they are weak when the tree depth is large. 
 
 \subsection{Collaborative Intrusion Detection Systems (CIDS)}
-Gómez et al. (2025) present a framework for collaborative intrusion detection in log data, emphasizing decentralized cooperation 
+Gómez et al. \cite{Gomez2025} present a framework for collaborative intrusion detection in log data, emphasizing decentralized cooperation 
 across organizations and systems.  
 The study categorizes detection approaches into sequential, embedding, and graph-based methods, and highlights the role 
 of collaboration in reducing false positives.  
@@ -654,26 +675,26 @@ Their open-source evaluation platform provides a structured benchmark for testin
 for reproducibility and standardized assessment in log anomaly detection research.  
 
 \subsection{ADALog: Adaptive Unsupervised Anomaly Detection in Logs}
-Zaremba et al. (2025) propose ADALog, a self-attention–based framework that leverages a pre-trained DistilBERT model 
+Zaremba et al. \cite{Zaremba2025} propose ADALog, a self-attention–based framework that leverages a pre-trained DistilBERT model 
 to detect anomalies in unstructured logs without requiring labeled data or parsing.  
 The model achieves competitive performance on benchmark datasets while improving interpretability through heatmap visualization.  
 However, its reliance on high computational resources and batch processing indicates the need for further optimization.  
 
 \subsection{LogBERT: Log Anomaly Detection via BERT}
-Guo et al. (2021) introduce LogBERT, a framework that applies BERT to system logs using self-supervised learning.  
+Guo et al. \cite{Guo2021} introduce LogBERT, a framework that applies BERT to system logs using self-supervised learning.  
 The model captures contextual dependencies through tasks such as masked log key prediction and clustering of normal behavior.  
 Experiments on datasets like HDFS and BGL show that LogBERT outperforms traditional and deep learning baselines.  
 While effective, it relies on log parsers and hyperparameter tuning, which may limit adaptability in dynamic environments.  
 
 \subsection{LAnoBERT: Log Anomaly Detection without Log Parsers}
-Lee, Kim, and Kang (2021) extend LogBERT by removing the dependency on log parsers, enabling direct analysis of raw log data.  
+Lee, Kim, and Kang \cite{Lee2021} extend LogBERT by removing the dependency on log parsers, enabling direct analysis of raw log data.  
 Using BERT’s masked language modeling, LAnoBERT improves flexibility and robustness across different log formats, 
 achieving competitive performance compared to parser-based models.  
 Its strengths lie in simplicity and adaptability, though it remains computationally demanding and less interpretable 
 than other approaches.  
 
 \subsection{Temporal Logical Attention Network (TLAN)}
-Liu et al. (2024) propose TLAN, a model that captures temporal and logical relationships in log sequences using multi-scale 
+Liu et al. \cite{Liu2024} propose TLAN, a model that captures temporal and logical relationships in log sequences using multi-scale 
 feature extraction and attention mechanisms.  
 Tested on distributed system logs, it improves detection of multi-step attacks such as SSH brute force followed 
 by privilege escalation.  
@@ -681,7 +702,7 @@ Despite higher computational requirements, TLAN demonstrates the importance of m
 for advanced log anomaly detection.  
 
 \subsection{Semi-Supervised Framework for ALICE O$^{2}$}
-Krupa et al. (2025) develop a semi-supervised framework for real-time anomaly detection in CERN’s ALICE O$^{2}$ logs.  
+Krupa et al. \cite{Krupa2025} develop a semi-supervised framework for real-time anomaly detection in CERN’s ALICE O$^{2}$ logs.  
 By combining limited labeled anomalies with abundant normal data, the system balances supervised and unsupervised learning, 
 improving detection accuracy and adaptability.  
 This approach shows promise for large-scale infrastructures, though scalability and generalization remain key challenges 
@@ -697,13 +718,13 @@ for broader adoption.
 \section{Tools}
 In recent years, researchers have developed specialized tools for log management and security analysis. These tools range from free to paid, each designed to meet organizations' needs in a way that best suits them. Most tools are designed for environments that handle massive amounts of data. This diversity is driven by the growing demand for flexible, scalable, and reliable cybersecurity solutions. Here, we review the most popular and widely used tools.
 \subsection{Graylog}
-Graylog is an open-source log management platform that allows centralized log collection, storage, and analysis. It provides dashboards, search functionality, and real-time alerts, making it a great option for small and medium-sized organizations.
+Graylog \cite{GraylogDocs} is an open-source log management platform that allows centralized log collection, storage, and analysis. It provides dashboards, search functionality, and real-time alerts, making it a great option for small and medium-sized organizations.
 
 \subsection{Splunk}
-Splunk is a widely used enterprise-grade tool for real-time log analysis and SIEM. It excels at processing large datasets and offers advanced search and visualization features. However, it comes with significant licensing costs.
+Splunk \cite{SplunkDocs} is a widely used enterprise-grade tool for real-time log analysis and SIEM. It excels at processing large datasets and offers advanced search and visualization features. However, it comes with significant licensing costs.
 
 \subsection{Elastic Stack (ELK)}
-The ELK stack (Elasticsearch, Logstash, Kibana) is a flexible, open-source solution for log ingestion, indexing, and visualization. It's highly customizable, but requires technical expertise for deployment and maintenance.
+The ELK stack \cite{ElasticDocs} (Elasticsearch, Logstash, Kibana) is a flexible, open-source solution for log ingestion, indexing, and visualization. It's highly customizable, but requires technical expertise for deployment and maintenance.
 
 \subsection{LogBERT}
 LogBERT is a research-oriented framework that uses BERT-based models to detect anomalies in logs. It doesn't require labeled data and provides high accuracy, making it effective for server and operating system environments.
@@ -712,19 +733,19 @@ LogBERT is a research-oriented framework that uses BERT-based models to detect a
 ADALog uses DistilBERT for unsupervised anomaly detection in unstructured logs. It's accurate and interpretable, but it works in batch mode and needs high-performance hardware.
 
 \subsection{Sumo Logic}
-Sumo Logic is a cloud-native log analytics platform that integrates machine learning for security monitoring and performance insights. It offers scalability and is ideal for cloud-based systems.
+Sumo Logic \cite{SumoLogicDocs} is a cloud-native log analytics platform that integrates machine learning for security monitoring and performance insights. It offers scalability and is ideal for cloud-based systems.
 
 \subsection{Datadog Log Management}
-Datadog integrates log collection with infrastructure and performance metrics. It's effective for distributed systems and microservices, offering unified observability.
+Datadog \cite{DatadogDocs} integrates log collection with infrastructure and performance metrics. It's effective for distributed systems and microservices, offering unified observability.
 
 \subsection{MobaXterm}
-MobaXterm is an enhanced terminal application for Windows that provides a comprehensive toolbox for remote computing. It combines an X11 server, SSH client, and multiple network tools in a single portable executable. For security administrators, MobaXterm offers secure SSH/SFTP connections to Linux servers, multi-tab terminal sessions, and built-in tools for network diagnostics. It is particularly useful for managing Ubuntu servers remotely, allowing administrators to monitor logs, execute commands, and transfer files securely. The free version provides essential features suitable for small teams and academic environments.
+MobaXterm \cite{MobaXterm2024} is an enhanced terminal application for Windows that provides a comprehensive toolbox for remote computing. It combines an X11 server, SSH client, and multiple network tools in a single portable executable. For security administrators, MobaXterm offers secure SSH/SFTP connections to Linux servers, multi-tab terminal sessions, and built-in tools for network diagnostics. It is particularly useful for managing Ubuntu servers remotely, allowing administrators to monitor logs, execute commands, and transfer files securely. The free version provides essential features suitable for small teams and academic environments.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{images/table-of-tools.png}
     \caption{Literature Review}
-    \label{fig:LiteratureReview}
+    \label{fig:LiteratureReviewTools}
 \end{figure}
 
 \section{Gab Research}
@@ -766,9 +787,9 @@ Analytical Intelligence (AI) is based on a multi-layered architecture focused on
 The feasibility of the system system will be evaluated through feasibility testing (technical, legal, operational and economic).
 
 \subsection{Technical Feasibility}
-The system relies on modern, widely adopted open source technologies, such as Ubuntu Server, Docker, FastAPI, PostgreSQL, and Suricata IDS. These technologies and tools have proven their technical proficiency and robustness, making them reliable components that ensure stability, scalability, and reliability even under challenging conditions.
+The system relies on modern, widely adopted open source technologies, such as Ubuntu Server \cite{Ubuntu2024}, Docker \cite{Docker2023}, FastAPI \cite{FastAPI2023}, PostgreSQL \cite{PostgreSQL2023}, and Suricata IDS \cite{Suricata2024}. These technologies and tools have proven their technical proficiency and robustness, making them reliable components that ensure stability, scalability, and reliability even under challenging conditions.
 
-The system uses Python for analysis, enrichment, and anomaly detection, making it flexible, given that it is one of the most widely used and powerful programming languages in the field of artificial intelligence. It also includes comprehensive libraries dedicated to data processing, deep learning, and cybersecurity.
+The system uses Python \cite{Python311} for analysis, enrichment, and anomaly detection, making it flexible, given that it is one of the most widely used and powerful programming languages in the field of artificial intelligence. It also includes comprehensive libraries dedicated to data processing, deep learning \cite{Hochreiter1997}, and cybersecurity.
 
 By leveraging this technology stack, the system avoids the costs and limitations of proprietary solutions, while maintaining the adaptability needed to integrate additional modules in the future. Its robust architecture allows organizations to start with an easy setup, running on a single server, and scale to multiple servers as log volumes or analysis requirements increase.
 
@@ -847,28 +868,30 @@ This dual-engine approach balances \textbf{adaptability} (LSTM learns normal beh
 \subsection{Presentation Layer}
 The presentation layer sits at the top of the system architecture and is designed to provide administrators and security analysts with a clear, intuitive, and actionable interface for system activity. A custom web dashboard built with Jinja2 templates and FastAPI is used to create interactive dashboards that transform log and detection data into clear insights. Dashboards present data through visual elements such as severity badges, detection tables, and device statistics pages that track the evolution of events over time.
 
-The presentation layer also supports the creation of exportable reports in formats such as XLSX and CSV. Combining ease of use with powerful analytical capabilities, this layer ensures that even users with limited technical expertise can easily monitor the system through an interface that provides the essential monitoring requirements.
+The presentation layer also supports the creation of exportable reports in formats such as XLSX and CSV. Combining ease of use with powerful analytical capabilities, this layer ensures that even users with limited technical expertise can easily monitor the system through an interface that provides the essential monitoring requirements. Visualization is handled by Jinja2 templates \cite{Jinja2023} and charts powered by Chart.js.
 
 \section{Dataset Description}
-Since we will be training, validating, and evaluating our anomaly detection model, we used the ToN Linux dataset. This dataset is part of the TON (Telecommunications and Internet of Things) cluster developed by the Cyber ​​Range Lab at UNSW Canberra and also hosted at huggingface. The dataset contains real-world logs generated from Ubuntu Linux servers in both normal operating and cyberattack scenarios.
+Since we will be training, validating, and evaluating our anomaly detection model, we used the OpenSSH dataset provided by LogHub \cite{OpenSSHLoghub}. This dataset is a widely recognized benchmark for log analysis and anomaly detection research.
 
-The dataset includes a wide range of system and security events, such as authentication logs, privilege escalations, process executions, and abnormal traffic patterns. This diversity makes it highly suitable for real-world server environments. One of its unique strengths is that it was specifically designed for research in intrusion detection and anomaly detection on Linux systems, which directly aligns with the scope of our project, which focuses on analyzing Ubuntu server logs.
+The OpenSSH dataset consists of over 600,000 log messages generated from real-world production servers. It captures a wide variety of SSH authentication events, including successful logins, failed password attempts, invalid user access, and session disconnects.
 
 We selected this dataset for several reasons:
 
 \begin{itemize}
-	\item \textbf{Relevance:} It contains Linux-based system logs, which are consistent with our project environment.
+	\item \textbf{Relevance:} It exclusively focuses on SSH authentication logs, which directly aligns with our project's goal of detecting brute-force and unauthorized access attempts on Ubuntu servers \cite{Ubuntu2022}.
 	
-	\item \textbf{Realism:} The data was collected from real systems exposed to a variety of attacks (e.g., brute force, DoS, privilege escalation), providing authentic testing conditions.
+	\item \textbf{Realism:} The logs are sourced from actual production environments, ensuring that our model is trained on realistic patterns rather than synthetic data.
 	
-	\item \textbf{Diversity:} It includes both benign and malicious events, supporting supervised, unsupervised, and hybrid anomaly detection approaches.
+	\item \textbf{Attack Patterns:} The dataset naturally contains real-world attack scenarios such as brute-force attacks, making it ideal for validating our anomaly detection logic.
 	
-	\item \textbf{Benchmarking:} The ToN datasets are widely used in academic research, enabling us to compare our results with other intrusion detection methods in the literature.
+	\item \textbf{Benchmarking:} As part of the LogHub collection \cite{OpenSSHLoghub}, it allows our results to be compared against other state-of-the-art log analysis methods in the literature \cite{Guo2021, He2016}.
 	
-	\item \textbf{Availability:} It is publicly available, well-documented, and pre-processed into structured formats, making it suitable for integration into our pipeline.
+	\item \textbf{Availability:} It is publicly available and structured, facilitating integration into our machine learning pipeline using Python \cite{Python311} and Scikit-learn \cite{ScikitLearn2023}.
 \end{itemize}
 
-By incorporating the ToN Linux Dataset, we ensure that the developed system is tested against realistic and representative data, which improves the reliability of our evaluation and demonstrates the effectiveness of our proposed log analysis framework.
+By incorporating the OpenSSH dataset, we demonstrate the system's capability to learn from standard security logs and effectively detect authentication anomalies.
+
+
 
 \section{End-to-End Workflow}
 The project will be implemented in a structured and carefully planned manner to ensure quality and reliability of the system. 
@@ -913,7 +936,7 @@ This section presents the system models that formalize the architecture and desi
 	\centering
 	\includegraphics[width=0.9\textwidth]{images/block-diagram.png}
 	\caption{System Block Diagram}
-	\label{fig:block}
+	\label{fig:block_ch3}
 \end{figure}
 
 \subsection{Use Case Model}
@@ -1359,10 +1382,10 @@ Table~\ref{tab:software-stack} lists the key technologies used in the implementa
 		Uvicorn & 0.23+ & ASGI server \\
 		PostgreSQL & 15 & Relational database \\
 		SQLAlchemy & 2.0+ & Async ORM \\
-		Suricata & 7.0+ & Network IDS signature detection \\
-		scikit-learn & 1.3+ & SSH LSTM model \\
+		Suricata & 7.0+ & Network IDS signature detection \cite{Suricata2024} \\
+		scikit-learn & 1.3+ & SSH LSTM model \cite{ScikitLearn2023} \\
 		joblib & 1.3+ & Model serialization \\
-		Jinja2 & 3.1+ & HTML templating \\
+		Jinja2 & 3.1+ & HTML templating \cite{Jinja2023} \\
 		httpx/requests & - & HTTP client for agents \\
 		\hline
 	\end{tabular}
@@ -1671,192 +1694,192 @@ Suricata signature-based detection validated using common attack tools:
 This chapter documented the implementation of Analytical-Intelligence, covering the software stack, environment configuration for SSH LSTM and Suricata IDS, sensor agent implementations (auth\_collector and suricata\_collector), central AI server with ingestion pipelines and detection engines, testing scenarios with real attack simulations, and validation results. The next chapter presents detailed evaluation results and analysis.
 
 
-% ------------------------- الفصل 6: Results & Discussions ----------
-\pagestyle{fancy}
-\fancyhf{}
-\lhead{Analytical Intelligence Project}
-\rhead{Chapter Six: Results and Discussion}
-\cfoot{\thepage}
+% % ------------------------- الفصل 6: Results & Discussions ----------
+% \pagestyle{fancy}
+% \fancyhf{}
+% \lhead{Analytical Intelligence Project}
+% \rhead{Chapter Six: Results and Discussion}
+% \cfoot{\thepage}
 
-\chapter{Results and Discussion}
-\label{ch:results}
+% \chapter{Results and Discussion}
+% \label{ch:results}
 
-\section{Chapter Introduction}
-This chapter presents the evaluation results of the Analytical-Intelligence system, focusing on performance metrics for both the SSH LSTM behavioral detection model and the Suricata IDS signature-based detection engine. We discuss detection accuracy, per-category performance, hybrid detection logic, threshold tuning considerations, real-world testing outcomes, and dashboard analytics.
+% \section{Chapter Introduction}
+% This chapter presents the evaluation results of the Analytical-Intelligence system, focusing on performance metrics for both the SSH LSTM behavioral detection model and the Suricata IDS signature-based detection engine. We discuss detection accuracy, per-category performance, hybrid detection logic, threshold tuning considerations, real-world testing outcomes, and dashboard analytics.
 
-\section{Performance Evaluation Metrics}
-\label{sec:eval-metrics}
-The following standard metrics are used to evaluate model performance:
+% \section{Performance Evaluation Metrics}
+% \label{sec:eval-metrics}
+% The following standard metrics are used to evaluate model performance:
 
-\begin{itemize}
-	\item \textbf{Accuracy:} Overall correct predictions / total predictions
-	\item \textbf{Precision:} True positives / (True positives + False positives)
-	\item \textbf{Recall:} True positives / (True positives + False negatives)
-	\item \textbf{F1-Score:} Harmonic mean of precision and recall
-	\item \textbf{Weighted F1:} F1-score weighted by class support
-	\item \textbf{Macro F1:} Unweighted mean of per-class F1-scores
-\end{itemize}
+% \begin{itemize}
+% 	\item \textbf{Accuracy:} Overall correct predictions / total predictions
+% 	\item \textbf{Precision:} True positives / (True positives + False positives)
+% 	\item \textbf{Recall:} True positives / (True positives + False negatives)
+% 	\item \textbf{F1-Score:} Harmonic mean of precision and recall
+% 	\item \textbf{Weighted F1:} F1-score weighted by class support
+% 	\item \textbf{Macro F1:} Unweighted mean of per-class F1-scores
+% \end{itemize}
 
-\section{Performance Results of Specialized Models}
-\label{sec:model-results}
+% \section{Performance Results of Specialized Models}
+% \label{sec:model-results}
 
-\subsection{Suricata IDS Detection Results}
-Suricata IDS provides signature-based detection using custom local rules configured for the deployment environment. Unlike ML models, Suricata's performance is measured by detection coverage and false positive rates in real-world testing.
+% \subsection{Suricata IDS Detection Results}
+% Suricata IDS provides signature-based detection using custom local rules configured for the deployment environment. Unlike ML models, Suricata's performance is measured by detection coverage and false positive rates in real-world testing.
 
-\subsubsection{Detection Coverage by Category}
-Table~\ref{tab:suricata-categories} shows the detection categories covered by the system:
+% \subsubsection{Detection Coverage by Category}
+% Table~\ref{tab:suricata-categories} shows the detection categories covered by the system:
 
-\begin{table}[H]
-	\centering
-	\caption{Suricata Detection Categories}
-	\label{tab:suricata-categories}
-	\begin{tabular}{|l|l|}
-		\hline
-		\textbf{Category} & \textbf{Description} \\
-		\hline
-		SCAN & Port scanning, service probes \\
-		DOS & DoS attacks, SYN floods \\
-		EXPLOIT & Known vulnerability exploits \\
-		WEB\_ATTACK & SQL injection, XSS attacks \\
-		\hline
-	\end{tabular}
-\end{table}
+% \begin{table}[H]
+% 	\centering
+% 	\caption{Suricata Detection Categories}
+% 	\label{tab:suricata-categories}
+% 	\begin{tabular}{|l|l|}
+% 		\hline
+% 		\textbf{Category} & \textbf{Description} \\
+% 		\hline
+% 		SCAN & Port scanning, service probes \\
+% 		DOS & DoS attacks, SYN floods \\
+% 		EXPLOIT & Known vulnerability exploits \\
+% 		WEB\_ATTACK & SQL injection, XSS attacks \\
+% 		\hline
+% 	\end{tabular}
+% \end{table}
 
-\subsubsection{Real-World Testing Results}
-Table~\ref{tab:suricata-testing} presents detection results from controlled attack simulations:
+% \subsubsection{Real-World Testing Results}
+% Table~\ref{tab:suricata-testing} presents detection results from controlled attack simulations:
 
-\begin{table}[H]
-	\centering
-	\caption{Suricata Real-World Testing Results}
-	\label{tab:suricata-testing}
-	\begin{tabular}{|l|l|c|c|}
-		\hline
-		\textbf{Attack Type} & \textbf{Tool Used} & \textbf{Detected} & \textbf{Avg. Latency} \\
-		\hline
-		SYN Port Scan & nmap -sS & $\checkmark$ & $<$1s \\
-		Service Version Scan & nmap -sV & $\checkmark$ & $<$1s \\
-		SYN Flood DoS & hping3 --flood & $\checkmark$ & $<$500ms \\
-		SSH Brute Force & hydra -l user & $\checkmark$ & $<$1s \\
-		HTTP Directory Scan & dirb, nikto & $\checkmark$ & $<$2s \\
-		\hline
-	\end{tabular}
-\end{table}
+% \begin{table}[H]
+% 	\centering
+% 	\caption{Suricata Real-World Testing Results}
+% 	\label{tab:suricata-testing}
+% 	\begin{tabular}{|l|l|c|c|}
+% 		\hline
+% 		\textbf{Attack Type} & \textbf{Tool Used} & \textbf{Detected} & \textbf{Avg. Latency} \\
+% 		\hline
+% 		SYN Port Scan & nmap -sS & $\checkmark$ & $<$1s \\
+% 		Service Version Scan & nmap -sV & $\checkmark$ & $<$1s \\
+% 		SYN Flood DoS & hping3 --flood & $\checkmark$ & $<$500ms \\
+% 		SSH Brute Force & hydra -l user & $\checkmark$ & $<$1s \\
+% 		HTTP Directory Scan & dirb, nikto & $\checkmark$ & $<$2s \\
+% 		\hline
+% 	\end{tabular}
+% \end{table}
 
-\subsubsection{Analysis of Suricata Results}
-\begin{itemize}
-	\item \textbf{Detection Latency:} Sub-second detection for most attack types due to real-time packet inspection
-	\item \textbf{Coverage:} Custom rules tailored for the deployment environment
-	\item \textbf{False Positive Rate:} Controlled via \texttt{SURICATA\_PROFILE} setting (low-noise, balanced, high)
-	\item \textbf{Flexibility:} Local rules can be customized for specific network patterns
-\end{itemize}
+% \subsubsection{Analysis of Suricata Results}
+% \begin{itemize}
+% 	\item \textbf{Detection Latency:} Sub-second detection for most attack types due to real-time packet inspection
+% 	\item \textbf{Coverage:} Custom rules tailored for the deployment environment
+% 	\item \textbf{False Positive Rate:} Controlled via \texttt{SURICATA\_PROFILE} setting (low-noise, balanced, high)
+% 	\item \textbf{Flexibility:} Local rules can be customized for specific network patterns
+% \end{itemize}
 
-\subsection{SSH LSTM Model Results}
-The SSH model evaluation consists of:
+% \subsection{SSH LSTM Model Results}
+% The SSH model evaluation consists of:
 
-\subsubsection{Threshold-Based Detection Results}
-\begin{itemize}
-	\item \textbf{True Positive Rate:} Successfully detects brute force attacks when failed login count exceeds threshold
-	\item \textbf{Source IP Extraction:} Correctly parses IP addresses from standard auth.log formats
-	\item \textbf{Token Recognition:} Correctly identifies FAILED\_PASSWORD, INVALID\_USER, and other SSH patterns
-\end{itemize}
+% \subsubsection{Threshold-Based Detection Results}
+% \begin{itemize}
+% 	\item \textbf{True Positive Rate:} Successfully detects brute force attacks when failed login count exceeds threshold
+% 	\item \textbf{Source IP Extraction:} Correctly parses IP addresses from standard auth.log formats
+% 	\item \textbf{Token Recognition:} Correctly identifies FAILED\_PASSWORD, INVALID\_USER, and other SSH patterns
+% \end{itemize}
 
-\subsubsection{SSH Model Limitations and Future Work}
-\begin{itemize}
-	\item Sequence-based LSTM detection requires further evaluation with labeled auth.log dataset
-	\item Current evaluation is qualitative based on lab testing
-	\item Future work: create labeled SSH attack dataset for quantitative metrics
-\end{itemize}
+% \subsubsection{SSH Model Limitations and Future Work}
+% \begin{itemize}
+% 	\item Sequence-based LSTM detection requires further evaluation with labeled auth.log dataset
+% 	\item Current evaluation is qualitative based on lab testing
+% 	\item Future work: create labeled SSH attack dataset for quantitative metrics
+% \end{itemize}
 
-\section{Discussion of Hybrid Detection Logic}
-\label{sec:hybrid-discussion}
+% \section{Discussion of Hybrid Detection Logic}
+% \label{sec:hybrid-discussion}
 
-\subsection{Threshold Tuning for SSH Model}
-\begin{itemize}
-	\item \textbf{SSH\_BRUTEFORCE\_THRESHOLD = 5:} Balanced setting detecting attacks without excessive false positives for legitimate failed logins
-	\item \textbf{SSH\_BRUTEFORCE\_WINDOW\_SECONDS = 300:} 5-minute window captures sustained attack patterns
-	\item \textbf{Tuning Guidance:} Increase threshold for high-traffic environments; decrease for stricter security
-\end{itemize}
+% \subsection{Threshold Tuning for SSH Model}
+% \begin{itemize}
+% 	\item \textbf{SSH\_BRUTEFORCE\_THRESHOLD = 5:} Balanced setting detecting attacks without excessive false positives for legitimate failed logins
+% 	\item \textbf{SSH\_BRUTEFORCE\_WINDOW\_SECONDS = 300:} 5-minute window captures sustained attack patterns
+% 	\item \textbf{Tuning Guidance:} Increase threshold for high-traffic environments; decrease for stricter security
+% \end{itemize}
 
-\subsection{Threshold Tuning for Suricata IDS}
-\begin{itemize}
-	\item \textbf{SURICATA\_PROFILE = balanced:} Default profile balancing detection sensitivity with false positive reduction
-	\item \textbf{low-noise profile:} Reduced sensitivity, fewer alerts, suitable for internet-facing servers
-	\item \textbf{high profile:} Maximum sensitivity, may generate more false positives
-	\item \textbf{Port Scan Tuning:} Custom \texttt{detection\_filter} (e.g., 100 packets in 5s) to reduce false positives from authorized scanners
-\end{itemize}
+% \subsection{Threshold Tuning for Suricata IDS}
+% \begin{itemize}
+% 	\item \textbf{SURICATA\_PROFILE = balanced:} Default profile balancing detection sensitivity with false positive reduction
+% 	\item \textbf{low-noise profile:} Reduced sensitivity, fewer alerts, suitable for internet-facing servers
+% 	\item \textbf{high profile:} Maximum sensitivity, may generate more false positives
+% 	\item \textbf{Port Scan Tuning:} Custom \texttt{detection\_filter} (e.g., 100 packets in 5s) to reduce false positives from authorized scanners
+% \end{itemize}
 
-\subsection{Deduplication and Alert Controls}
-\begin{itemize}
-	\item \textbf{Signature-based Deduplication:} Same (src\_ip, signature\_id) within window aggregated
-	\item \textbf{Occurrence Tracking:} Each detection tracks occurrence count for repeated attacks
-	\item \textbf{Effect:} Reduces alert volume by 70-90\% during sustained attacks while preserving evidence
-\end{itemize}
+% \subsection{Deduplication and Alert Controls}
+% \begin{itemize}
+% 	\item \textbf{Signature-based Deduplication:} Same (src\_ip, signature\_id) within window aggregated
+% 	\item \textbf{Occurrence Tracking:} Each detection tracks occurrence count for repeated attacks
+% 	\item \textbf{Effect:} Reduces alert volume by 70-90\% during sustained attacks while preserving evidence
+% \end{itemize}
 
-\subsection{Severity Assignment Logic}
-\begin{table}[H]
-	\centering
-	\caption{Severity Assignment Rules}
-	\label{tab:severity-rules}
-	\begin{tabular}{|l|l|l|}
-		\hline
-		\textbf{Severity} & \textbf{SSH LSTM Model} & \textbf{Suricata IDS} \\
-		\hline
-		CRITICAL & - & Suricata severity 1 (high priority) \\
-		HIGH & Brute force $\geq$ 10 attempts & Suricata severity 2, DoS/DDoS \\
-		MEDIUM & Brute force 5-9 attempts & Suricata severity 3, Port Scanning \\
-		LOW & Anomaly score near threshold & Policy violations, low priority \\
-		\hline
-	\end{tabular}
-\end{table}
+% \subsection{Severity Assignment Logic}
+% \begin{table}[H]
+% 	\centering
+% 	\caption{Severity Assignment Rules}
+% 	\label{tab:severity-rules}
+% 	\begin{tabular}{|l|l|l|}
+% 		\hline
+% 		\textbf{Severity} & \textbf{SSH LSTM Model} & \textbf{Suricata IDS} \\
+% 		\hline
+% 		CRITICAL & - & Suricata severity 1 (high priority) \\
+% 		HIGH & Brute force $\geq$ 10 attempts & Suricata severity 2, DoS/DDoS \\
+% 		MEDIUM & Brute force 5-9 attempts & Suricata severity 3, Port Scanning \\
+% 		LOW & Anomaly score near threshold & Policy violations, low priority \\
+% 		\hline
+% 	\end{tabular}
+% \end{table}
 
-\section{Dashboard Outcomes}
-\label{sec:dashboard-outcomes}
-The web dashboard displays detections from both SSH LSTM and Suricata IDS engines:
+% \section{Dashboard Outcomes}
+% \label{sec:dashboard-outcomes}
+% The web dashboard displays detections from both SSH LSTM and Suricata IDS engines:
 
-\subsection{Real-Time Analytics}
-The dashboard provides five analytical visualizations:
-\begin{itemize}
-	\item \textbf{Detections Over Time:} Hourly detection trend chart
-	\item \textbf{Severity Breakdown:} Distribution of CRITICAL, HIGH, MEDIUM, LOW alerts
-	\item \textbf{Top Attack Types:} Most frequent detection labels
-	\item \textbf{Top Attacker IPs:} Source IPs generating most alerts
-	\item \textbf{Alerts by Device:} Per-sensor detection counts
-\end{itemize}
+% \subsection{Real-Time Analytics}
+% The dashboard provides five analytical visualizations:
+% \begin{itemize}
+% 	\item \textbf{Detections Over Time:} Hourly detection trend chart
+% 	\item \textbf{Severity Breakdown:} Distribution of CRITICAL, HIGH, MEDIUM, LOW alerts
+% 	\item \textbf{Top Attack Types:} Most frequent detection labels
+% 	\item \textbf{Top Attacker IPs:} Source IPs generating most alerts
+% 	\item \textbf{Alerts by Device:} Per-sensor detection counts
+% \end{itemize}
 
-\subsection{Detection Evidence Fields}
-Each detection record includes:
-\begin{itemize}
-	\item \textbf{Common Fields:} timestamp, device\_id, model\_name, label, score, severity
-	\item \textbf{SSH Detections:} src\_ip, failed\_count, username, token sequence
-	\item \textbf{Suricata Detections:} signature, signature\_id, category, src\_ip, dest\_ip, dest\_port
-\end{itemize}
+% \subsection{Detection Evidence Fields}
+% Each detection record includes:
+% \begin{itemize}
+% 	\item \textbf{Common Fields:} timestamp, device\_id, model\_name, label, score, severity
+% 	\item \textbf{SSH Detections:} src\_ip, failed\_count, username, token sequence
+% 	\item \textbf{Suricata Detections:} signature, signature\_id, category, src\_ip, dest\_ip, dest\_port
+% \end{itemize}
 
-\subsection{Alert Notification Flow}
-\begin{enumerate}
-	\item Detection created by SSH LSTM or received from Suricata
-	\item Severity mapped based on attack type and source
-	\item If severity $\geq$ TELEGRAM\_MIN\_SEVERITY: enqueue to NotificationBus
-	\item TelegramNotifier sends formatted alert with detection details
-\end{enumerate}
+% \subsection{Alert Notification Flow}
+% \begin{enumerate}
+% 	\item Detection created by SSH LSTM or received from Suricata
+% 	\item Severity mapped based on attack type and source
+% 	\item If severity $\geq$ TELEGRAM\_MIN\_SEVERITY: enqueue to NotificationBus
+% 	\item TelegramNotifier sends formatted alert with detection details
+% \end{enumerate}
 
-\subsection{Operational Metrics}
-During a 7-day testing period, the system demonstrated:
-\begin{itemize}
-	\item \textbf{Total Events Processed:} 50,000+ auth events, 10,000+ Suricata alerts
-	\item \textbf{Detection Accuracy:} 100\% for known attack patterns in controlled tests
-	\item \textbf{System Uptime:} 99.9\% availability with automatic sensor reconnection
-	\item \textbf{Alert Latency:} $<$2 seconds from attack to dashboard display
-\end{itemize}
+% \subsection{Operational Metrics}
+% During a 7-day testing period, the system demonstrated:
+% \begin{itemize}
+% 	\item \textbf{Total Events Processed:} 50,000+ auth events, 10,000+ Suricata alerts
+% 	\item \textbf{Detection Accuracy:} 100\% for known attack patterns in controlled tests
+% 	\item \textbf{System Uptime:} 99.9\% availability with automatic sensor reconnection
+% 	\item \textbf{Alert Latency:} $<$2 seconds from attack to dashboard display
+% \end{itemize}
 
-\section{Summary}
-This chapter presented the evaluation results for both detection engines. The SSH LSTM model successfully detects brute force attacks using dual detection (threshold + ML-based) with configurable sensitivity. Suricata IDS provides comprehensive network threat detection with sub-second latency covering 25,000+ attack signatures. The hybrid detection system combining behavioral analysis (SSH LSTM) with signature-based detection (Suricata) provides defense-in-depth coverage of both known and anomalous threats. The dashboard delivers real-time visibility with analytics, evidence preservation, and Telegram alerting for high-severity incidents.
+% \section{Summary}
+% This chapter presented the evaluation results for both detection engines. The SSH LSTM model successfully detects brute force attacks using dual detection (threshold + ML-based) with configurable sensitivity. Suricata IDS provides comprehensive network threat detection with sub-second latency covering 25,000+ attack signatures. The hybrid detection system combining behavioral analysis (SSH LSTM) with signature-based detection (Suricata) provides defense-in-depth coverage of both known and anomalous threats. The dashboard delivers real-time visibility with analytics, evidence preservation, and Telegram alerting for high-severity incidents.
 
 
 % ------------------------- الفصل 7: Conclusions & Recs -------------
 \pagestyle{fancy}
 \fancyhf{}
 \lhead{Analytical Intelligence Project}
-\rhead{Chapter Seven: Conclusions and Recommendations}
+\rhead{Chapter Six: Conclusions and Recommendations}
 \cfoot{\thepage}
 
 \chapter{Conclusions and Recommendations}
@@ -1958,17 +1981,14 @@ This project serves as a foundation for continued research and development in in
 
 
 % ------------------------- المراجع -------------------------------
-\chapter{References}
-\bibliographystyle{IEEEtran} % أو plain, apa, unsrt, etc.
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Analytical Intelligence Project}
+\rhead{References}
+\cfoot{\thepage}
+
+\renewcommand{\bibname}{References}
+\bibliographystyle{IEEEtran}
 \bibliography{references}
-
-% ------------------------- الملاحق -------------------------------
-\appendix
-\chapter{Appendix A}
-% ضع أي مواد إضافية: استبيانات، شفرة، جداول مطولة…
-
-
-
-
 
 \end{document}

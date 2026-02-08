@@ -90,7 +90,7 @@ bash scripts/sensor_up.sh
 
 # 4. Verify containers
 docker ps
-# Expected: ai_db-auth-collector, ai_db-flow-collector both "Up"
+# Expected: ai_db-auth-collector, ai_db-suricata-collector both "Up"
 ```
 
 ### Verification
@@ -377,11 +377,10 @@ docker compose -f docker-compose.analysis.yml up -d
 
 ## E. ML Model Issues
 
-### E1. Model Files Not Found
+### E1. SSH Model Not Loaded
 
 #### Symptoms
 ```
-Network RF model not loaded
 SSH LSTM model not loaded
 ```
 
@@ -391,15 +390,11 @@ SSH LSTM model not loaded
 ```bash
 ls -la models/ssh/
 # Expected: ssh_lstm.joblib
-
-ls -la models/RF/
-# Expected: random_forest.joblib, feature_list.json, label_map.json
 ```
 
 **2. Check volume mounts:**
 ```bash
 docker exec ai_db-backend ls -la /app/models/ssh/
-docker exec ai_db-backend ls -la /app/models/RF/
 ```
 
 **3. Restart backend:**
@@ -407,78 +402,7 @@ docker exec ai_db-backend ls -la /app/models/RF/
 docker compose -f docker-compose.analysis.yml restart backend
 ```
 
-### E2. scikit-learn Version Mismatch
 
-#### Symptoms
-```
-InconsistentVersionWarning
-UserWarning: Trying to unpickle estimator
-```
-or predictions fail.
-
-#### Cause
-Model was trained with different scikit-learn/numpy version than container has.
-
-#### Fix Steps
-
-**1. Check versions in logs:**
-```bash
-docker compose -f docker-compose.analysis.yml logs backend | grep -i "version\|warning"
-```
-
-**2. Pin versions in requirements.txt and rebuild:**
-```bash
-# Edit services/backend/requirements.txt
-# Add specific versions like:
-# scikit-learn==1.3.0
-# numpy==1.24.0
-
-# Then rebuild
-docker compose -f docker-compose.analysis.yml build --no-cache backend
-docker compose -f docker-compose.analysis.yml up -d
-```
-
-### E3. Quick Python Model Test
-
-```bash
-docker exec -it ai_db-backend python3 -c "
-import joblib
-model = joblib.load('/app/models/RF/random_forest.joblib')
-print('Model loaded successfully')
-print(f'Model type: {type(model).__name__}')
-"
-```
-
-### E4. Too Many False Positives
-
-#### Cause
-Network ML threshold too low.
-
-#### Fix
-```bash
-# Edit .env on Analysis server
-NETWORK_ML_THRESHOLD=0.70   # Increase from 0.60
-
-# Restart backend
-docker compose -f docker-compose.analysis.yml restart backend
-```
-
-### E5. Missing Detections
-
-#### Cause
-Threshold too high or gating layer filtering.
-
-#### Fix
-
-**Lower threshold:**
-```bash
-NETWORK_ML_THRESHOLD=0.50
-```
-
-**Check gating layer settings:**
-```bash
-ML_MIN_FLOW_RATE_PPS=50    # Lower from 100
-```
 
 ---
 
@@ -700,7 +624,7 @@ docker compose -f docker-compose.sensor.yml up -d
 
 ### H3. Host Network Mode Issues
 
-Flow collector uses `network_mode: host` for packet capture.
+Suricata collector uses `network_mode: host` for packet capture.
 
 **Implications:**
 - Container shares host's network namespace
@@ -709,7 +633,7 @@ Flow collector uses `network_mode: host` for packet capture.
 
 **Verify capture works:**
 ```bash
-docker compose -f docker-compose.sensor.yml logs flow_collector
+docker compose -f docker-compose.sensor.yml logs suricata_collector
 # Should show "Capturing on ens33..." or similar
 ```
 
@@ -740,7 +664,7 @@ timedatectl status
 | Same DEVICE_ID on multiple sensors | Events mixed up | Unique ID per sensor |
 | API key mismatch | 401 Unauthorized | Ensure same key on both |
 | Running sensor before analyzer | Connection refused | Start analyzer first |
-| Using wrong network interface | No flows captured | Run `ip link show` |
+| Using wrong network interface | No packets captured | Run `ip link show` |
 | Forgetting to open firewall | Timeout | `sudo ufw allow 8000` |
 | Using `down -v` accidentally | Data lost | Use `down` without `-v` |
 | Running `docker system prune -a` | Slow rebuilds | Avoid; deletes cache |

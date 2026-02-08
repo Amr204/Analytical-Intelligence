@@ -5,7 +5,9 @@
     <!-- Left Sidebar: Filters Panel -->
     <aside class="reports-sidebar" id="reports-sidebar">
         <div class="sidebar-section">
-            <h3 class="sidebar-title">📊 Report Type</h3>
+            <h3 class="sidebar-title"><svg class="icon icon-sm">
+                    <use xlink:href="/static/icons.svg#icon-chart" />
+                </svg> Report Type</h3>
 
             <!-- Report Type Cards (replaces dropdown) -->
             <div class="report-type-cards">
@@ -14,7 +16,8 @@
 
                 <div class="report-card {% if filters.report_type == 'auth' or not filters.report_type %}selected{% endif %}"
                     data-type="auth" onclick="selectReportType('auth')">
-                    <span class="report-card-icon">🔐</span>
+                    <span class="report-card-icon-dot"
+                        style="background: linear-gradient(135deg, #667eea, #764ba2);"></span>
                     <div class="report-card-content">
                         <strong>Auth Detections</strong>
                         <span>SSH LSTM model</span>
@@ -23,16 +26,18 @@
 
                 <div class="report-card {% if filters.report_type == 'network' %}selected{% endif %}"
                     data-type="network" onclick="selectReportType('network')">
-                    <span class="report-card-icon">🌐</span>
+                    <span class="report-card-icon-dot"
+                        style="background: linear-gradient(135deg, var(--cyber-blue), #00a8cc);"></span>
                     <div class="report-card-content">
-                        <strong>Network Detections</strong>
-                        <span>Random Forest model</span>
+                        <strong>Suricata Alerts</strong>
+                        <span>IDS/IPS detections</span>
                     </div>
                 </div>
 
                 <div class="report-card {% if filters.report_type == 'device' %}selected{% endif %}" data-type="device"
                     onclick="selectReportType('device')">
-                    <span class="report-card-icon">💻</span>
+                    <span class="report-card-icon-dot"
+                        style="background: linear-gradient(135deg, #ffc107, #ff9800);"></span>
                     <div class="report-card-content">
                         <strong>By Device</strong>
                         <span>Device-specific audit</span>
@@ -42,7 +47,9 @@
         </div>
 
         <div class="sidebar-section">
-            <h3 class="sidebar-title">⏱️ Time Range</h3>
+            <h3 class="sidebar-title"><svg class="icon icon-sm">
+                    <use xlink:href="/static/icons.svg#icon-clock" />
+                </svg> Time Range</h3>
             <div class="time-chips">
                 <button type="button" class="chip {% if filters.last_minutes == 60 %}active{% endif %}"
                     data-minutes="60" onclick="setTimeRange(60)">1h</button>
@@ -59,7 +66,9 @@
         </div>
 
         <div class="sidebar-section">
-            <h3 class="sidebar-title">🎯 Filters</h3>
+            <h3 class="sidebar-title"><svg class="icon icon-sm">
+                    <use xlink:href="/static/icons.svg#icon-filter" />
+                </svg> Filters</h3>
             <form method="get" id="report-form" class="sidebar-filters">
                 <!-- Hidden inputs for card selections -->
                 <input type="hidden" name="report_type" id="form_report_type"
@@ -95,7 +104,9 @@
 
                 <div class="sidebar-actions">
                     <button type="submit" class="btn btn-primary btn-block">
-                        🔍 Apply Filters
+                        <svg class="icon icon-sm">
+                            <use xlink:href="/static/icons.svg#icon-filter" />
+                        </svg> Apply Filters
                     </button>
                     <a href="/reports" class="btn btn-secondary btn-block">Clear All</a>
                 </div>
@@ -104,22 +115,32 @@
 
         <!-- Export Section -->
         <div class="sidebar-section export-section">
-            <h3 class="sidebar-title">📥 Export</h3>
+            <h3 class="sidebar-title"><svg class="icon icon-sm">
+                    <use xlink:href="/static/icons.svg#icon-download" />
+                </svg> Export</h3>
             <p class="export-note">
-                <span class="info-icon">ℹ️</span>
+                <svg class="icon icon-xs" style="color: var(--text-muted);">
+                    <use xlink:href="/static/icons.svg#icon-info" />
+                </svg>
                 Export up to 5,000 rows
             </p>
             <div class="export-dropdown" id="export-dropdown">
                 <button type="button" class="btn btn-export-main" id="export-btn" {% if not detections %}disabled{%
                     endif %}>
-                    📥 Export Data ▾
+                    <svg class="icon icon-sm">
+                        <use xlink:href="/static/icons.svg#icon-download" />
+                    </svg> Export Data ▾
                 </button>
                 <div class="export-menu" id="export-menu">
                     <button type="button" class="export-option" onclick="exportData('csv')">
-                        📄 Export as CSV
+                        <svg class="icon icon-sm">
+                            <use xlink:href="/static/icons.svg#icon-file" />
+                        </svg> Export as CSV
                     </button>
                     <button type="button" class="export-option" onclick="exportData('xlsx')">
-                        📊 Export as Excel
+                        <svg class="icon icon-sm">
+                            <use xlink:href="/static/icons.svg#icon-chart" />
+                        </svg> Export as Excel
                     </button>
                 </div>
             </div>
@@ -129,13 +150,17 @@
 
     <!-- Mobile Filter Toggle -->
     <button class="mobile-filter-toggle" id="mobile-filter-toggle">
-        🔧 Filters &amp; Options
+        <svg class="icon icon-sm">
+            <use xlink:href="/static/icons.svg#icon-settings" />
+        </svg> Filters &amp; Options
     </button>
 
     <!-- Main Content: Dashboard -->
     <main class="reports-main">
         <div class="reports-header">
-            <h1>📈 Detection Reports</h1>
+            <h1><svg class="icon icon-lg">
+                    <use xlink:href="/static/icons.svg#icon-chart" />
+                </svg> Detection Reports</h1>
             <p class="subtitle">Real-time analytics and export</p>
         </div>
 
@@ -176,42 +201,42 @@
         <!-- KPI Summary Cards -->
         <div class="kpi-grid" id="kpi-grid">
             <div class="kpi-card">
-                <div class="kpi-icon">📊</div>
+                <div class="kpi-dot" style="background: linear-gradient(135deg, #667eea, #764ba2);"></div>
                 <div class="kpi-content">
                     <span class="kpi-value" id="kpi-total">{{ detections|length }}</span>
                     <span class="kpi-label">Total Records</span>
                 </div>
             </div>
             <div class="kpi-card critical">
-                <div class="kpi-icon">🔴</div>
+                <div class="kpi-dot" style="background: var(--severity-critical);"></div>
                 <div class="kpi-content">
                     <span class="kpi-value" id="kpi-critical">0</span>
                     <span class="kpi-label">Critical</span>
                 </div>
             </div>
             <div class="kpi-card high">
-                <div class="kpi-icon">🟠</div>
+                <div class="kpi-dot" style="background: var(--severity-high);"></div>
                 <div class="kpi-content">
                     <span class="kpi-value" id="kpi-high">0</span>
                     <span class="kpi-label">High</span>
                 </div>
             </div>
             <div class="kpi-card medium">
-                <div class="kpi-icon">🟡</div>
+                <div class="kpi-dot" style="background: var(--severity-medium);"></div>
                 <div class="kpi-content">
                     <span class="kpi-value" id="kpi-medium">0</span>
                     <span class="kpi-label">Medium</span>
                 </div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-icon">💻</div>
+                <div class="kpi-dot" style="background: linear-gradient(135deg, var(--cyber-blue), #00a8cc);"></div>
                 <div class="kpi-content">
                     <span class="kpi-value" id="kpi-devices">0</span>
                     <span class="kpi-label">Devices</span>
                 </div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-icon">🏷️</div>
+                <div class="kpi-dot" style="background: linear-gradient(135deg, #ffc107, #ff9800);"></div>
                 <div class="kpi-content">
                     <span class="kpi-value kpi-label-text" id="kpi-top-label">-</span>
                     <span class="kpi-label">Top Label</span>
@@ -350,14 +375,10 @@
 {# ===================== Reports Page Data + Script (FIXED) ===================== #}
 {% block extra_scripts %}
 
-<!-- 1) Embed server data safely as JSON (NOT JS) -->
-<script id="detections-json" type="application/json">
-    {{ detections | tojson }}
-  </script>
+<!-- 1) Embed server data safely as JSON (pre-serialized from Python) -->
+<script id="detections-json" type="application/json">{{ detections_json | safe }}</script>
 
-<script id="filters-json" type="application/json">
-    {{ filters | tojson }}
-  </script>
+<script id="filters-json" type="application/json">{{ filters_json | safe }}</script>
 
 <!-- 2) Read the JSON and run your report logic -->
 <script>

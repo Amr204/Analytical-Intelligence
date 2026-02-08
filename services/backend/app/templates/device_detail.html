@@ -38,6 +38,45 @@
                     </span>
                 </div>
                 <div class="detail-row">
+                    <span class="detail-label">Approval Status</span>
+                    <span class="detail-value">
+                        {% if device.approval_status == 'allowed' %}
+                        <span class="approval-badge approval-allowed">
+                            <svg class="icon icon-xs">
+                                <use xlink:href="/static/icons.svg#icon-check" />
+                            </svg>
+                            Allowed
+                        </span>
+                        {% elif device.approval_status == 'blocked' %}
+                        <span class="approval-badge approval-blocked">
+                            <svg class="icon icon-xs">
+                                <use xlink:href="/static/icons.svg#icon-x" />
+                            </svg>
+                            Blocked
+                        </span>
+                        {% else %}
+                        <span class="approval-badge approval-pending">
+                            <svg class="icon icon-xs">
+                                <use xlink:href="/static/icons.svg#icon-clock" />
+                            </svg>
+                            Pending
+                        </span>
+                        {% endif %}
+                    </span>
+                </div>
+                {% if device.approval_status == 'allowed' and device.approved_by %}
+                <div class="detail-row">
+                    <span class="detail-label">Approved By</span>
+                    <span class="detail-value">{{ device.approved_by }}</span>
+                </div>
+                {% endif %}
+                {% if device.approval_status == 'blocked' and device.blocked_reason %}
+                <div class="detail-row">
+                    <span class="detail-label">Block Reason</span>
+                    <span class="detail-value text-danger">{{ device.blocked_reason }}</span>
+                </div>
+                {% endif %}
+                <div class="detail-row">
                     <span class="detail-label">Last Seen</span>
                     <span class="detail-value timestamp">{{ device.last_seen[:19] if device.last_seen else 'Never'
                         }}</span>
@@ -65,6 +104,55 @@
                     <span class="detail-value">{{ device.tags }}</span>
                 </div>
                 {% endif %}
+            </div>
+
+            <!-- Approval Actions -->
+            <div class="device-approval-actions"
+                style="margin-top: var(--spacing-lg); padding-top: var(--spacing-md); border-top: 1px solid var(--border-color);">
+                <h3 style="margin-bottom: var(--spacing-sm); font-size: 0.9rem; color: var(--text-secondary);">Device
+                    Approval</h3>
+                <div class="approval-forms">
+                    {% if device.approval_status != 'allowed' %}
+                    <form method="post" action="/devices/{{ device.device_id }}/allow" style="display:inline;">
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <svg class="icon icon-sm">
+                                <use xlink:href="/static/icons.svg#icon-check" />
+                            </svg>
+                            Allow Device
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% if device.approval_status != 'blocked' %}
+                    <form method="post" action="/devices/{{ device.device_id }}/block"
+                        style="display: flex; gap: var(--spacing-sm); align-items: flex-end; margin-top: var(--spacing-sm);">
+                        <div style="flex: 1;">
+                            <label for="block-reason" style="font-size: 0.75rem; color: var(--text-muted);">Block Reason
+                                (optional)</label>
+                            <input type="text" name="reason" id="block-reason" class="form-input"
+                                placeholder="Enter reason for blocking..." style="margin-top: 4px;">
+                        </div>
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            <svg class="icon icon-sm">
+                                <use xlink:href="/static/icons.svg#icon-x" />
+                            </svg>
+                            Block Device
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% if device.approval_status == 'blocked' %}
+                    <form method="post" action="/devices/{{ device.device_id }}/pending"
+                        style="display:inline; margin-top: var(--spacing-sm);">
+                        <button type="submit" class="btn btn-secondary btn-sm">
+                            <svg class="icon icon-sm">
+                                <use xlink:href="/static/icons.svg#icon-clock" />
+                            </svg>
+                            Reset to Pending
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
             </div>
         </div>
 

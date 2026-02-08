@@ -28,17 +28,6 @@ PROJECT_ROOT = _detect_project_root(Path(__file__).resolve())
 # SSH model path
 DEFAULT_SSH_MODEL_PATH = str(PROJECT_ROOT / "models/ssh/ssh_lstm.joblib")
 
-# RF Network model paths 
-DEFAULT_NETWORK_MODEL_PATH = str(PROJECT_ROOT / "models/RF/random_forest.joblib")
-DEFAULT_NETWORK_FEATURES_PATH = str(PROJECT_ROOT / "models/RF/feature_list.json")
-DEFAULT_NETWORK_LABELS_PATH = str(PROJECT_ROOT / "models/RF/label_map.json")
-DEFAULT_NETWORK_PREPROCESS_PATH = str(PROJECT_ROOT / "models/RF/preprocess_config.json")
-DEFAULT_NETWORK_METRICS_PATH = str(PROJECT_ROOT / "models/RF/metrics.json")
-
-# Default allowlist: only these attack labels will create detections
-DEFAULT_NETWORK_LABEL_ALLOWLIST = "DoS,DDoS,Port Scanning,Brute Force"
-
-
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
@@ -50,6 +39,7 @@ class Settings(BaseSettings):
 
     # Security
     ingest_api_key: str = "ONuMcisin3paJYkPDaf0tt9n2deEBeaN"
+    ui_session_secret: str = "CHANGE_ME_IN_PRODUCTION_32CHARS!"  # For SessionMiddleware
 
     # Server
     backend_host: str = "0.0.0.0"
@@ -57,39 +47,21 @@ class Settings(BaseSettings):
 
     # Model paths (env can override: SSH_MODEL_PATH, NETWORK_MODEL_PATH, ...)
     ssh_model_path: str = DEFAULT_SSH_MODEL_PATH
-    network_model_path: str = DEFAULT_NETWORK_MODEL_PATH
-    network_features_path: str = DEFAULT_NETWORK_FEATURES_PATH
-    network_labels_path: str = DEFAULT_NETWORK_LABELS_PATH
-    network_preprocess_path: str = DEFAULT_NETWORK_PREPROCESS_PATH
-    network_metrics_path: str = DEFAULT_NETWORK_METRICS_PATH
 
     # Detection thresholds
-    network_ml_threshold: float = 0.60
+    # network_ml_threshold: float = 0.60 # REMOVED
 
     # SSH Detection
     ssh_bruteforce_window_seconds: int = 300
     ssh_bruteforce_threshold: int = 5
     ssh_spray_username_threshold: int = 10 
+    ssh_ml_threshold: float = 0.80  # Increased for higher confidence (was 0.5) 
 
     # Network ML
-    ml_dedup_window_seconds: int = 10  # Small window for ~6s detection cadence
-    ml_min_flow_rate_pps: int = 100
-    ml_min_bytes_per_second: int = 1000
-    ml_cooldown_seconds_per_src: int = 0  # Disabled by default for reliable detection
-
-    # Network Label Allowlist (comma-separated)
-    # Only these labels will create detection records
-    # Default: DoS, DDoS, Port Scanning, Brute Force
-    network_label_allowlist: str = DEFAULT_NETWORK_LABEL_ALLOWLIST
+    # REMOVED: Network RF model is no longer used.
     
-    # What to do with non-allowed labels: "ignore" (skip) or "map_to_normal" (log only)
-    # Recommended: "ignore" - don't store any record for Web Attacks, Bots, etc.
-    network_non_allow_action: str = "ignore"
-
-    # ─────────────────────────────────────────────────────────────────────────
     # Telegram Alerts (Optional)
-    # ─────────────────────────────────────────────────────────────────────────
-    telegram_enabled: bool = False
+    telegram_enabled: bool = True
     telegram_bot_token: str = ""  # MUST be set via env, never hardcoded
     telegram_chat_id: str = "-5228638760"  # Default: Analytical Intelligence | SOC Team
     telegram_min_severity: str = "HIGH"  # Only send alerts >= this severity
@@ -100,13 +72,14 @@ class Settings(BaseSettings):
     telegram_disable_web_preview: bool = True
     telegram_startup_test: bool = False  # Send test message on startup
     public_dashboard_base_url: str = ""  # Optional: for dashboard links in alerts
+    
+    # Social Links (for Home page, optional)
+    app_telegram_url: str = "https://t.me/+ni5ZN6NtgrkzMjg8"  # Telegram channel/group URL
+    app_github_url: str = "https://github.com/Amr204/Analytical-Intelligence"  # GitHub repo URL
+    app_discord_url: str = "https://discord.gg/Be567jTM"  # Discord server URL
+    app_drive_url: str = "https://drive.google.com/drive/u/2/my-drive"  # Google Drive URL
 
-    @property
-    def network_label_allowlist_set(self) -> Set[str]:
-        """Parse allowlist string into a set of normalized labels."""
-        if not self.network_label_allowlist:
-            return set()
-        return {label.strip() for label in self.network_label_allowlist.split(",") if label.strip()}
+
 
 
 # Global settings instance

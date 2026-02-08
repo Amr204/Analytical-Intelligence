@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Analytical-Intelligence{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Home Page Specific Styles */
+    .home-content {
+        padding: 0;
+        max-width: 100%;
+    }
+
+    /* Hero Section */
+    .hero-section {
+        min-height: 60vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: var(--spacing-2xl);
+        background: linear-gradient(180deg, var(--bg-deep) 0%, var(--bg-void) 100%);
+        border-bottom: 1px solid var(--glass-border);
+    }
+
+    .hero-logo {
+        width: 120px;
+        height: 120px;
+        margin-bottom: var(--spacing-lg);
+        color: var(--neon-green);
+        filter: drop-shadow(0 0 30px var(--neon-green-glow));
+        animation: pulse-glow 3s ease-in-out infinite;
+    }
+
+    .hero-title {
+        font-family: var(--font-display);
+        font-size: 3rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: var(--spacing-sm);
+        letter-spacing: 3px;
+        text-transform: uppercase;
+    }
+
+    .hero-subtitle {
+        font-size: 1.1rem;
+        color: var(--text-secondary);
+        max-width: 600px;
+        margin: 0 auto;
+        line-height: 1.8;
+    }
+
+    /* About Section */
+    .about-section {
+        padding: var(--spacing-2xl);
+        max-width: 900px;
+        margin: 0 auto;
+        text-align: center;
+    }
+
+    .section-title {
+        font-family: var(--font-display);
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--cyber-blue);
+        margin-bottom: var(--spacing-lg);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+
+    .about-text {
+        font-size: 1rem;
+        color: var(--text-secondary);
+        line-height: 1.8;
+    }
+
+    /* Technology & Capabilities Cards */
+    .cards-section {
+        padding: var(--spacing-2xl);
+        background: var(--bg-panel);
+    }
+
+    .cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: var(--spacing-lg);
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .tech-card {
+        background: var(--bg-card);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-lg);
+        border: 1px solid var(--glass-border);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .tech-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--neon-green), var(--cyber-blue));
+    }
+
+    .tech-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-card);
+        border-color: var(--neon-green);
+    }
+
+    .tech-card-icon {
+        width: 48px;
+        height: 48px;
+        color: var(--neon-green);
+        margin-bottom: var(--spacing-md);
+    }
+
+    .tech-card-title {
+        font-family: var(--font-display);
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: var(--spacing-sm);
+    }
+
+    .tech-card-desc {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        line-height: 1.6;
+    }
+
+    /* Capabilities Section */
+    .capabilities-section {
+        padding: var(--spacing-2xl);
+    }
+
+    .capability-card {
+        background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-panel) 100%);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-lg);
+        border: 1px solid var(--glass-border);
+        transition: all 0.3s ease;
+    }
+
+    .capability-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-glow-blue);
+        border-color: var(--cyber-blue);
+    }
+
+    .capability-card-icon {
+        width: 40px;
+        height: 40px;
+        color: var(--cyber-blue);
+        margin-bottom: var(--spacing-sm);
+    }
+
+    /* Footer */
+    .home-footer {
+        padding: var(--spacing-2xl);
+        background: var(--bg-deep);
+        border-top: 1px solid var(--glass-border);
+        text-align: center;
+    }
+
+    .footer-links {
+        display: flex;
+        justify-content: center;
+        gap: var(--spacing-xl);
+        margin-bottom: var(--spacing-lg);
+        flex-wrap: wrap;
+    }
+
+    .footer-link {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        transition: color 0.3s ease;
+    }
+
+    .footer-link:hover {
+        color: var(--neon-green);
+    }
+
+    .footer-version {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    @media (max-width: 768px) {
+        .hero-title {
+            font-size: 2rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="home-content">
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <svg class="hero-logo">
+            <use xlink:href="/static/icons.svg#icon-suricata" />
+        </svg>
+        <h1 class="hero-title">Analytical Intelligence</h1>
+        <p class="hero-subtitle">
+            Real-time Security Intelligence and Event Management Platform.
+            Powered by Machine Learning and Signature-based Detection.
+        </p>
+    </section>
+
+    <!-- About Section -->
+    <section class="about-section">
+        <h2 class="section-title">About The Project</h2>
+        <p class="about-text">
+            Analytical Intelligence is a comprehensive security monitoring solution that combines
+            machine learning-based anomaly detection with signature-based intrusion detection.
+            It provides real-time visibility into security events across your infrastructure,
+            enabling rapid threat detection and response.
+        </p>
+    </section>
+
+    <!-- Technologies Section -->
+    <section class="cards-section">
+        <h2 class="section-title" style="text-align:center; margin-bottom:var(--spacing-xl);">Technologies</h2>
+        <div class="cards-grid">
+            <div class="tech-card">
+                <svg class="tech-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-suricata" />
+                </svg>
+                <h3 class="tech-card-title">Suricata IDS</h3>
+                <p class="tech-card-desc">High-performance network IDS/IPS with custom rule support for signature-based
+                    threat detection.</p>
+            </div>
+            <div class="tech-card">
+                <svg class="tech-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-models" />
+                </svg>
+                <h3 class="tech-card-title">TensorFlow ML</h3>
+                <p class="tech-card-desc">LSTM neural networks for SSH anomaly detection and behavioral analysis.</p>
+            </div>
+            <div class="tech-card">
+                <svg class="tech-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-chart" />
+                </svg>
+                <h3 class="tech-card-title">NFStream</h3>
+                <p class="tech-card-desc">High-performance network flow collection and feature extraction library.</p>
+            </div>
+            <div class="tech-card">
+                <svg class="tech-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-database" />
+                </svg>
+                <h3 class="tech-card-title">PostgreSQL</h3>
+                <p class="tech-card-desc">Robust relational database for storing events, detections, and analytics data.
+                </p>
+            </div>
+            <div class="tech-card">
+                <svg class="tech-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-database" />
+                </svg>
+                <h3 class="tech-card-title">SQLAlchemy</h3>
+                <p class="tech-card-desc">Python ORM for database migrations, async queries, and model management.</p>
+            </div>
+            <div class="tech-card">
+                <svg class="tech-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-server" />
+                </svg>
+                <h3 class="tech-card-title">FastAPI Backend</h3>
+                <p class="tech-card-desc">High-performance async Python backend with real-time event processing.</p>
+            </div>
+            <div class="tech-card">
+                <svg class="tech-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-file" />
+                </svg>
+                <h3 class="tech-card-title">Jinja2 Templates</h3>
+                <p class="tech-card-desc">Powerful templating engine for dynamic HTML rendering and UI components.</p>
+            </div>
+            <div class="tech-card">
+                <svg class="tech-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-devices" />
+                </svg>
+                <h3 class="tech-card-title">Docker</h3>
+                <p class="tech-card-desc">Containerized deployment for consistent and scalable infrastructure.</p>
+            </div>
+            <div class="tech-card">
+                <svg class="tech-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-terminal" />
+                </svg>
+                <h3 class="tech-card-title">MobaXterm</h3>
+                <p class="tech-card-desc">Advanced terminal with SSH, X11, and remote session management for server
+                    access.</p>
+            </div>
+            <div class="tech-card">
+                <svg class="tech-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-settings" />
+                </svg>
+                <h3 class="tech-card-title">pgAdmin</h3>
+                <p class="tech-card-desc">PostgreSQL administration tool for database management and query execution.
+                </p>
+            </div>
+            <div class="tech-card">
+                <svg class="tech-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-activity" />
+                </svg>
+                <h3 class="tech-card-title">Chart.js</h3>
+                <p class="tech-card-desc">Interactive data visualization library for real-time dashboard charts and
+                    analytics.</p>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- Capabilities Section -->
+    <section class="capabilities-section">
+        <h2 class="section-title" style="text-align:center; margin-bottom:var(--spacing-xl);">Capabilities</h2>
+        <div class="cards-grid">
+            <div class="capability-card">
+                <svg class="capability-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-lock" />
+                </svg>
+                <h3 class="tech-card-title">SSH Anomaly Detection</h3>
+                <p class="tech-card-desc">ML-powered detection of brute force attacks and suspicious SSH authentication
+                    patterns.</p>
+            </div>
+            <div class="capability-card">
+                <svg class="capability-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-alerts" />
+                </svg>
+                <h3 class="tech-card-title">Network Intrusion Detection</h3>
+                <p class="tech-card-desc">Suricata-based signature detection with custom rules for known attack
+                    patterns.</p>
+            </div>
+            <div class="capability-card">
+                <svg class="capability-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-activity" />
+                </svg>
+                <h3 class="tech-card-title">Real-time Alerting</h3>
+                <p class="tech-card-desc">Instant Telegram notifications for HIGH and CRITICAL severity events.</p>
+            </div>
+            <div class="capability-card">
+                <svg class="capability-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-reports" />
+                </svg>
+                <h3 class="tech-card-title">Comprehensive Reports</h3>
+                <p class="tech-card-desc">Detailed analytics and exportable reports for security auditing.</p>
+            </div>
+            <div class="capability-card">
+                <svg class="capability-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-devices" />
+                </svg>
+                <h3 class="tech-card-title">Multi-Device Monitoring</h3>
+                <p class="tech-card-desc">Centralized monitoring of multiple sensors across distributed infrastructure.
+                </p>
+            </div>
+            <div class="capability-card">
+                <svg class="capability-card-icon">
+                    <use xlink:href="/static/icons.svg#icon-dashboard" />
+                </svg>
+                <h3 class="tech-card-title">Analytics Dashboard</h3>
+                <p class="tech-card-desc">Visual insights into security trends, attack patterns, and system health.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="home-footer">
+        <div class="footer-links">
+            <a href="/dashboard" class="footer-link">Dashboard</a>
+            <a href="/alerts" class="footer-link">Alerts</a>
+            <a href="/reports" class="footer-link">Reports</a>
+            <a href="/devices" class="footer-link">Devices</a>
+        </div>
+        <p class="footer-version">Version Virgen</p>
+    </footer>
+</div>
+{% endblock %}

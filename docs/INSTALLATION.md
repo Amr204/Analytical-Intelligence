@@ -168,7 +168,7 @@ INGEST_API_KEY=<YOUR_SECURE_API_KEY>
 
 ```bash
 ls -la models/ssh/
-ls -la models/RF/
+
 ```
 
 ### 7. Start Analysis Stack
@@ -185,6 +185,12 @@ bash scripts/analysis_up.sh
 docker ps
 curl -s http://localhost:8000/api/v1/health | jq
 ```
+
+### 9. Verify pgAdmin (Database UI)
+
+Open `http://<ANALYZER_IP>:5050` in your browser.
+- **Email:** `admin@local.com` (or value in .env)
+- **Password:** `change_me` (or value in .env)
 
 ---
 
@@ -252,7 +258,11 @@ bash scripts/sensor_up.sh
 docker ps
 ```
 
-**Expected:** `ai_db-auth-collector` and `ai_db-flow-collector` both "Up"
+**Expected:**
+- `ai_db-auth-collector` ... Up
+- `ai_db-suricata-collector` ... Up (Health: healthy)
+- `ai_db-suricata` ... Up (Health: healthy)
+- `ai_db-suricata-collector` ... Up
 
 ---
 
@@ -277,7 +287,7 @@ docker ps
 **On Sensor server:**
 ```bash
 docker ps
-# Expected: ai_db-auth-collector and ai_db-flow-collector
+# Expected: ai_db-auth-collector and ai_db-suricata-collector
 ```
 
 ### 3. Logs

@@ -1,5 +1,10 @@
 # syntax=docker/dockerfile:1.6
-FROM python:3.11-slim
+# ==============================================
+# Analytical-Intelligence Backend
+# Optimized for layer caching
+# ==============================================
+
+FROM python:3.11-slim AS base
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -17,19 +22,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create app directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY requirements.txt .
-
-# Install Python dependencies with BuildKit cache
+# ==============================================
+# Layer 1: Heavy dependencies (cached long-term)
+# These rarely change: tensorflow, numpy
+# ==============================================
+COPY requirements-heavy.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
-    pip install -r requirements.txt
+    pip install -r requirements-heavy.txt
 
-# Copy application code
+# ==============================================
+# Layer 2: Light dependencies (changes more often)
+# Web, database, utilities
+# ==============================================
+COPY requirements-light.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements-light.txt
+
+# ==============================================
+# Layer 3: Application code (changes most often)
+# ==============================================
 COPY app/ ./app/
 
-# Create models directories (will be mounted)
-RUN mkdir -p /app/models/ssh /app/models/RF
+# Create models directory (will be mounted)
+RUN mkdir -p /app/models/ssh
 
 # Expose port
 EXPOSE 8000

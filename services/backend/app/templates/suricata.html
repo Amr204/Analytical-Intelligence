@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+    /* Suricata page-specific styles - matching app theme */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 1024px) {
+        .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 600px) {
+        .kpi-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .kpi-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        text-align: center;
+    }
+
+    .kpi-card h3 {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+        margin: 0 0 0.5rem 0;
+    }
+
+    .kpi-value {
+        font-size: 2rem;
+        font-weight: 700;
+        font-family: var(--font-display);
+    }
+
+    .kpi-value.critical {
+        color: var(--severity-critical);
+    }
+
+    .kpi-value.high {
+        color: var(--severity-high);
+    }
+
+    .kpi-value.medium {
+        color: var(--severity-medium);
+    }
+
+    .kpi-value.low {
+        color: var(--severity-low);
+    }
+
+    /* Two-column layout for table and sidebar */
+    .suricata-grid {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 1.5rem;
+    }
+
+    @media (max-width: 1200px) {
+        .suricata-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Sidebar widgets */
+    .sidebar-widgets {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .widget-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 1rem;
+    }
+
+    .widget-card h3 {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+        margin: 0 0 0.75rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .widget-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .widget-list li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        font-size: 0.85rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .widget-list li:last-child {
+        border-bottom: none;
+    }
+
+    .widget-list .label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 180px;
+        color: var(--text-secondary);
+    }
+
+    .widget-list .count {
+        font-weight: 600;
+        font-family: var(--font-mono);
+        color: var(--neon-green);
+    }
+
+    .flow-cell {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .signature-cell {
+        max-width: 300px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .severity-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 0.5rem;
+    }
+
+    .severity-dot.critical {
+        background: var(--severity-critical);
+    }
+
+    .severity-dot.high {
+        background: var(--severity-high);
+    }
+
+    .severity-dot.medium {
+        background: var(--severity-medium);
+    }
+
+    .severity-dot.low {
+        background: var(--severity-low);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-content">
+    <div class="page-header">
+        <h1><svg class="icon icon-lg">
+                <use xlink:href="/static/icons.svg#icon-shield" />
+            </svg> Suricata IDS</h1>
+        <p class="subtitle">Network Intrusion Detection System Alerts</p>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <h3>Critical (24h)</h3>
+            <div class="kpi-value critical">{{ severity_stats.CRITICAL|default(0) }}</div>
+        </div>
+        <div class="kpi-card">
+            <h3>High (24h)</h3>
+            <div class="kpi-value high">{{ severity_stats.HIGH|default(0) }}</div>
+        </div>
+        <div class="kpi-card">
+            <h3>Medium (24h)</h3>
+            <div class="kpi-value medium">{{ severity_stats.MEDIUM|default(0) }}</div>
+        </div>
+        <div class="kpi-card">
+            <h3>Low (24h)</h3>
+            <div class="kpi-value low">{{ severity_stats.LOW|default(0) }}</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-card">
+        <form method="get" action="/events/suricata" class="filters-form">
+            <div class="filter-group">
+                <label for="severity">Severity</label>
+                <select name="severity" id="severity">
+                    <option value="">All</option>
+                    <option value="CRITICAL" {% if filters.severity=='CRITICAL' %}selected{% endif %}>CRITICAL</option>
+                    <option value="HIGH" {% if filters.severity=='HIGH' %}selected{% endif %}>HIGH</option>
+                    <option value="MEDIUM" {% if filters.severity=='MEDIUM' %}selected{% endif %}>MEDIUM</option>
+                    <option value="LOW" {% if filters.severity=='LOW' %}selected{% endif %}>LOW</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="src_ip">Source IP</label>
+                <input type="text" name="src_ip" id="src_ip" placeholder="e.g. 192.168.1.1"
+                    value="{{ filters.src_ip or '' }}">
+            </div>
+            <div class="filter-group">
+                <label for="dst_ip">Destination IP</label>
+                <input type="text" name="dst_ip" id="dst_ip" placeholder="e.g. 10.0.0.1"
+                    value="{{ filters.dst_ip or '' }}">
+            </div>
+            <div class="filter-group">
+                <label for="last_minutes">Time Range</label>
+                <select name="last_minutes" id="last_minutes">
+                    <option value="">All Time</option>
+                    <option value="5" {% if filters.last_minutes==5 %}selected{% endif %}>Last 5 min</option>
+                    <option value="15" {% if filters.last_minutes==15 %}selected{% endif %}>Last 15 min</option>
+                    <option value="60" {% if filters.last_minutes==60 %}selected{% endif %}>Last 1 hour</option>
+                    <option value="1440" {% if filters.last_minutes==1440 %}selected{% endif %}>Last 24 hours</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <svg class="icon">
+                    <use xlink:href="/static/icons.svg#icon-filter" />
+                </svg>
+                Filter
+            </button>
+            <a href="/events/suricata" class="btn btn-secondary">Reset</a>
+        </form>
+    </div>
+
+    <!-- Results Info -->
+    <div class="results-info">
+        <span>Showing {{ detections|length }} alerts</span>
+        {% if filters.src_ip %}
+        <span class="filter-tag">Source: {{ filters.src_ip }}</span>
+        {% endif %}
+        {% if filters.dst_ip %}
+        <span class="filter-tag">Dest: {{ filters.dst_ip }}</span>
+        {% endif %}
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="suricata-grid">
+        <!-- Alerts Table -->
+        <div class="section-card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Severity</th>
+                        <th>Signature</th>
+                        <th>Flow</th>
+                        <th>Proto</th>
+                        <th>SID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in detections %}
+                    <tr class="severity-row-{{ (d.severity or 'low')|lower }}">
+                        <td class="timestamp">{{ d.ts[:19] if d.ts else '-' }}</td>
+                        <td><span class="severity-badge {{ (d.severity or 'low')|lower }}">{{ d.severity|default('N/A')
+                                }}</span></td>
+                        <td class="signature-cell" title="{{ d.label|default('') }}">{{ d.label|default('-') }}</td>
+                        <td class="flow-cell">
+                            {{ d.src_ip or '?' }}:{{ d.src_port or '?' }} → {{ d.dst_ip or '?' }}:{{ d.dst_port or '?'
+                            }}
+                        </td>
+                        <td>{{ d.proto|default('-') }}</td>
+                        <td><code>{{ d.sid|default('-') }}</code></td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <svg class="icon icon-xl">
+                                <use xlink:href="/static/icons.svg#icon-shield" />
+                            </svg>
+                            <span>No Suricata alerts found</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Sidebar Widgets -->
+        <div class="sidebar-widgets">
+            <div class="widget-card">
+                <h3>
+                    <svg class="icon icon-sm">
+                        <use xlink:href="/static/icons.svg#icon-alerts" />
+                    </svg>
+                    Top Signatures (24h)
+                </h3>
+                {% if top_signatures %}
+                <ul class="widget-list">
+                    {% for sig in top_signatures[:5] %}
+                    <li>
+                        <span class="label" title="{{ sig.label }}">{{ sig.label[:35] }}{% if sig.label|length > 35
+                            %}...{% endif %}</span>
+                        <span class="count">{{ sig.count }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p style="color: var(--text-muted); font-size: 0.85rem;">No data available</p>
+                {% endif %}
+            </div>
+
+            <div class="widget-card">
+                <h3>
+                    <svg class="icon icon-sm">
+                        <use xlink:href="/static/icons.svg#icon-devices" />
+                    </svg>
+                    Top Source IPs (24h)
+                </h3>
+                {% if top_src_ips %}
+                <ul class="widget-list">
+                    {% for ip in top_src_ips[:5] %}
+                    <li>
+                        <span class="label">{{ ip.ip }}</span>
+                        <span class="count">{{ ip.count }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p style="color: var(--text-muted); font-size: 0.85rem;">No data available</p>
+                {% endif %}
+            </div>
+
+            <div class="widget-card">
+                <h3>
+                    <svg class="icon icon-sm">
+                        <use xlink:href="/static/icons.svg#icon-chart" />
+                    </svg>
+                    Severity Breakdown (24h)
+                </h3>
+                <ul class="widget-list">
+                    <li>
+                        <span class="label"><span class="severity-dot critical"></span>Critical</span>
+                        <span class="count">{{ severity_stats.CRITICAL|default(0) }}</span>
+                    </li>
+                    <li>
+                        <span class="label"><span class="severity-dot high"></span>High</span>
+                        <span class="count">{{ severity_stats.HIGH|default(0) }}</span>
+                    </li>
+                    <li>
+                        <span class="label"><span class="severity-dot medium"></span>Medium</span>
+                        <span class="count">{{ severity_stats.MEDIUM|default(0) }}</span>
+                    </li>
+                    <li>
+                        <span class="label"><span class="severity-dot low"></span>Low</span>
+                        <span class="count">{{ severity_stats.LOW|default(0) }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Auto-refresh every 30 seconds
+    setTimeout(function () {
+        location.reload();
+    }, 30000);
+</script>
+{% endblock %}

@@ -7,7 +7,7 @@ from typing import Optional, List, Any, Dict
 import logging
 import json
 
-from sqlalchemy import Column, String, BigInteger, Text, Float, DateTime, create_engine, text
+from sqlalchemy import Column, String, BigInteger, Text, Float, DateTime, Boolean, create_engine, text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import INET, JSONB
@@ -54,6 +54,11 @@ class Device(Base):
     os: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     role: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     tags: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # Device approval workflow
+    approval_status: Mapped[str] = mapped_column(String, nullable=False, default='pending')
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    blocked_reason: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
 
 class RawEvent(Base):
@@ -94,6 +99,95 @@ class Detection(Base):
     proto: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
 
+class User(Base):
+    """User model for UI authentication only."""
+    __tablename__ = "users"
+    
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    full_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class UserLoginState(Base):
+    """User login state for lockout tracking."""
+    __tablename__ = "user_login_state"
+    
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    failed_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    lock_level: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)  # 0=none, 1=5min, 2=1h
+    lock_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_failed: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+async def ensure_schema() -> None:
+    """
+    Ensure database schema is up to date with idempotent DDL.
+    Called once on app startup via lifespan handler.
+    Note: asyncpg doesn't allow multiple statements in one execute(),
+    so we run each migration statement separately.
+    """
+    async with engine.begin() as conn:
+        # Add new columns to devices table if they don't exist
+        # Run each statement separately (asyncpg limitation)
+        await conn.execute(text(
+            "ALTER TABLE devices ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'pending'"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE devices ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ NULL"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE devices ADD COLUMN IF NOT EXISTS approved_by TEXT NULL"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE devices ADD COLUMN IF NOT EXISTS blocked_reason TEXT NULL"
+        ))
+        
+        # Create users table if not exists
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS users (
+                id BIGSERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                full_name TEXT NULL,
+                password_hash TEXT NOT NULL,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                last_login TIMESTAMPTZ NULL
+            )
+        """))
+        
+        # Create user_login_state table if not exists
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS user_login_state (
+                user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                failed_count INT NOT NULL DEFAULT 0,
+                lock_level INT NOT NULL DEFAULT 0,
+                lock_until TIMESTAMPTZ NULL,
+                last_failed TIMESTAMPTZ NULL,
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """))
+        
+        # Create indexes separately
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_devices_approval_status ON devices(approval_status)"
+        ))
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)"
+        ))
+        
+        # Backward compatibility: set existing devices (with NULL approval_status) to 'allowed'
+        await conn.execute(text(
+            "UPDATE devices SET approval_status = 'allowed' WHERE approval_status IS NULL OR approval_status = ''"
+        ))
+        
+        logger.info("Database schema migration completed")
+
+
 async def get_session() -> AsyncSession:
     """Get a database session."""
     async with async_session_factory() as session:
@@ -106,11 +200,15 @@ async def ensure_device(
     hostname: str | None = None,
     ip: str | None = None
 ) -> None:
-    """Upsert device and update last_seen timestamp."""
+    """
+    Upsert device and update last_seen timestamp.
+    On first insert: approval_status='pending'.
+    On conflict: NEVER overwrite approval_status (preserve admin decision).
+    """
     await session.execute(
         text("""
-            INSERT INTO devices (device_id, hostname, ip, created_at, last_seen)
-            VALUES (:device_id, :hostname, NULLIF(:ip, ''), NOW(), NOW())
+            INSERT INTO devices (device_id, hostname, ip, created_at, last_seen, approval_status)
+            VALUES (:device_id, :hostname, NULLIF(:ip, ''), NOW(), NOW(), 'pending')
             ON CONFLICT (device_id) DO UPDATE
             SET
               hostname = COALESCE(EXCLUDED.hostname, devices.hostname),
@@ -119,6 +217,72 @@ async def ensure_device(
         """),
         {"device_id": device_id, "hostname": hostname, "ip": ip or ""}
     )
+
+
+async def get_device_approval_status(session: AsyncSession, device_id: str) -> Optional[str]:
+    """Get the approval status of a device."""
+    result = await session.execute(
+        text("SELECT approval_status FROM devices WHERE device_id = :device_id"),
+        {"device_id": device_id}
+    )
+    row = result.first()
+    return row[0] if row else None
+
+
+async def set_device_approval_status(
+    session: AsyncSession,
+    device_id: str,
+    status: str,
+    approved_by: str | None = None,
+    reason: str | None = None
+) -> bool:
+    """
+    Set the approval status of a device.
+    status: 'allowed', 'blocked', or 'pending'
+    Returns True if device was found and updated.
+    """
+    if status not in ('allowed', 'blocked', 'pending'):
+        raise ValueError(f"Invalid status: {status}")
+    
+    if status == 'allowed':
+        result = await session.execute(
+            text("""
+                UPDATE devices 
+                SET approval_status = :status,
+                    approved_at = NOW(),
+                    approved_by = :approved_by,
+                    blocked_reason = NULL
+                WHERE device_id = :device_id
+            """),
+            {"device_id": device_id, "status": status, "approved_by": approved_by}
+        )
+    elif status == 'blocked':
+        result = await session.execute(
+            text("""
+                UPDATE devices 
+                SET approval_status = :status,
+                    approved_at = NULL,
+                    approved_by = NULL,
+                    blocked_reason = :reason
+                WHERE device_id = :device_id
+            """),
+            {"device_id": device_id, "status": status, "reason": reason}
+        )
+    else:  # pending
+        result = await session.execute(
+            text("""
+                UPDATE devices 
+                SET approval_status = :status,
+                    approved_at = NULL,
+                    approved_by = NULL,
+                    blocked_reason = NULL
+                WHERE device_id = :device_id
+            """),
+            {"device_id": device_id, "status": status}
+        )
+    
+    await session.commit()
+    return result.rowcount > 0
 
 
 async def insert_raw_event(
@@ -189,6 +353,7 @@ async def get_devices_summary(session: AsyncSession) -> List[Dict[str, Any]]:
     - alerts_count_24h, alerts_count_1h
     - last_alert_ts
     - status (online/offline)
+    - approval_status, blocked_reason
     """
     result = await session.execute(
         text("""
@@ -202,7 +367,9 @@ async def get_devices_summary(session: AsyncSession) -> List[Dict[str, Any]]:
                 d.role,
                 COALESCE(stats.alerts_24h, 0) as alerts_count_24h,
                 COALESCE(stats.alerts_1h, 0) as alerts_count_1h,
-                stats.last_alert_ts
+                stats.last_alert_ts,
+                d.approval_status,
+                d.blocked_reason
             FROM devices d
             LEFT JOIN (
                 SELECT 
@@ -241,7 +408,9 @@ async def get_devices_summary(session: AsyncSession) -> List[Dict[str, Any]]:
             "alerts_count_24h": row[7] or 0,
             "alerts_count_1h": row[8] or 0,
             "last_alert_ts": row[9].isoformat() if row[9] else None,
-            "status": status
+            "status": status,
+            "approval_status": row[10] or 'pending',
+            "blocked_reason": row[11]
         })
     
     return devices
@@ -251,14 +420,15 @@ async def get_device_detail(session: AsyncSession, device_id: str) -> Optional[D
     """
     Get detailed information about a specific device.
     Returns:
-    - device profile fields
+    - device profile fields (including approval status)
     - recent alerts (limit 50)
     - alert stats by label in last 24h
     """
     # Get device info
     result = await session.execute(
         text("""
-            SELECT device_id, hostname, ip, last_seen, created_at, os, role, tags
+            SELECT device_id, hostname, ip, last_seen, created_at, os, role, tags,
+                   approval_status, approved_at, approved_by, blocked_reason
             FROM devices
             WHERE device_id = :device_id
         """),
@@ -285,7 +455,11 @@ async def get_device_detail(session: AsyncSession, device_id: str) -> Optional[D
         "os": row[5],
         "role": row[6],
         "tags": row[7],
-        "status": status
+        "status": status,
+        "approval_status": row[8] or 'pending',
+        "approved_at": row[9].isoformat() if row[9] else None,
+        "approved_by": row[10],
+        "blocked_reason": row[11]
     }
     
     # Get recent alerts
@@ -542,3 +716,207 @@ async def get_raw_events(
         }
         for row in rows
     ]
+
+
+# =====================================================
+# Dashboard Analytics Functions
+# =====================================================
+
+async def get_dashboard_analytics(session: AsyncSession, window_hours: int = 24) -> Dict[str, Any]:
+    """
+    Get comprehensive dashboard analytics for the specified time window.
+    
+    Returns aggregated data for 5 chart visuals + summary statistics:
+    - V1: Detections Over Time (hourly buckets)
+    - V2: Severity Breakdown
+    - V3: Top Attack Types (labels)
+    - V4: Top Attacker IPs
+    - V5: Alerts by Device
+    - Summary: totals and threat intensity
+    
+    All queries use proper parameterization and efficient GROUP BY aggregation.
+    """
+    analytics = {}
+    now = datetime.utcnow()
+    
+    # Build interval string for PostgreSQL (safe - validated integer)
+    interval_str = f"{int(window_hours)} hours"
+    
+    # ─────────────────────────────────────────────────────────────
+    # V1: Timeseries - Detections per hour
+    # ─────────────────────────────────────────────────────────────
+    result = await session.execute(
+        text(f"""
+            SELECT 
+                date_trunc('hour', ts) AS hour_bucket,
+                COUNT(*) AS detection_count
+            FROM detections
+            WHERE ts >= NOW() - INTERVAL '{interval_str}'
+            GROUP BY hour_bucket
+            ORDER BY hour_bucket ASC
+        """)
+    )
+    rows = result.fetchall()
+    
+    # Build complete timeline with zero-fills for missing hours
+    hour_data = {}
+    for row in rows:
+        bucket = row[0]
+        if bucket:
+            hour_data[bucket.replace(tzinfo=None)] = row[1]
+    
+    timeseries_labels = []
+    timeseries_values = []
+    for i in range(window_hours, 0, -1):
+        hour = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=i)
+        timeseries_labels.append(hour.strftime('%H:%M'))
+        timeseries_values.append(hour_data.get(hour, 0))
+    
+    analytics["timeseries"] = {
+        "labels": timeseries_labels,
+        "values": timeseries_values
+    }
+    
+    # ─────────────────────────────────────────────────────────────
+    # V2: Severity Breakdown
+    # ─────────────────────────────────────────────────────────────
+    result = await session.execute(
+        text(f"""
+            SELECT 
+                severity,
+                COUNT(*) AS detection_count
+            FROM detections
+            WHERE ts >= NOW() - INTERVAL '{interval_str}'
+            GROUP BY severity
+            ORDER BY 
+                CASE severity
+                    WHEN 'CRITICAL' THEN 1
+                    WHEN 'HIGH' THEN 2
+                    WHEN 'MEDIUM' THEN 3
+                    WHEN 'LOW' THEN 4
+                    ELSE 5
+                END
+        """)
+    )
+    rows = result.fetchall()
+    analytics["severity"] = {
+        "labels": [row[0] for row in rows] if rows else [],
+        "values": [row[1] for row in rows] if rows else []
+    }
+    
+    # ─────────────────────────────────────────────────────────────
+    # V3: Top Attack Types (Top 8 labels by count)
+    # ─────────────────────────────────────────────────────────────
+    result = await session.execute(
+        text(f"""
+            SELECT 
+                label,
+                COUNT(*) AS detection_count
+            FROM detections
+            WHERE ts >= NOW() - INTERVAL '{interval_str}'
+              AND label IS NOT NULL
+            GROUP BY label
+            ORDER BY detection_count DESC
+            LIMIT 8
+        """)
+    )
+    rows = result.fetchall()
+    analytics["top_labels"] = {
+        "labels": [row[0][:35] if row[0] else 'Unknown' for row in rows],
+        "values": [row[1] for row in rows]
+    }
+    
+    # ─────────────────────────────────────────────────────────────
+    # V4: Top Attacker IPs (Top 8 src_ip, exclude null/empty)
+    # ─────────────────────────────────────────────────────────────
+    result = await session.execute(
+        text(f"""
+            SELECT 
+                src_ip,
+                COUNT(*) AS attack_count
+            FROM detections
+            WHERE ts >= NOW() - INTERVAL '{interval_str}'
+              AND src_ip IS NOT NULL 
+              AND src_ip != ''
+              AND src_ip != '0.0.0.0'
+            GROUP BY src_ip
+            ORDER BY attack_count DESC
+            LIMIT 8
+        """)
+    )
+    rows = result.fetchall()
+    analytics["top_attackers"] = {
+        "labels": [row[0] for row in rows] if rows else [],
+        "values": [row[1] for row in rows] if rows else []
+    }
+    
+    # ─────────────────────────────────────────────────────────────
+    # V5: Alerts by Device (Top 8 devices)
+    # ─────────────────────────────────────────────────────────────
+    result = await session.execute(
+        text(f"""
+            SELECT 
+                COALESCE(device_id, 'Unknown') AS device,
+                COUNT(*) AS alert_count
+            FROM detections
+            WHERE ts >= NOW() - INTERVAL '{interval_str}'
+            GROUP BY device_id
+            ORDER BY alert_count DESC
+            LIMIT 8
+        """)
+    )
+    rows = result.fetchall()
+    analytics["by_device"] = {
+        "labels": [row[0] for row in rows] if rows else [],
+        "values": [row[1] for row in rows] if rows else []
+    }
+    
+    # ─────────────────────────────────────────────────────────────
+    # Summary Statistics (single efficient query)
+    # ─────────────────────────────────────────────────────────────
+    result = await session.execute(
+        text(f"""
+            SELECT 
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE severity IN ('HIGH', 'CRITICAL')) AS high_critical,
+                COUNT(DISTINCT device_id) AS unique_devices,
+                COUNT(DISTINCT src_ip) FILTER (WHERE src_ip IS NOT NULL AND src_ip != '') AS unique_attackers
+            FROM detections
+            WHERE ts >= NOW() - INTERVAL '{interval_str}'
+        """)
+    )
+    row = result.first()
+    total_window = row[0] if row else 0
+    high_critical_window = row[1] if row else 0
+    unique_devices = row[2] if row else 0
+    unique_attackers = row[3] if row else 0
+    
+    # Recent activity (5-minute window) for threat intensity
+    result = await session.execute(
+        text("""
+            SELECT 
+                COUNT(*) AS total_5m,
+                COUNT(*) FILTER (WHERE severity IN ('HIGH', 'CRITICAL')) AS high_critical_5m
+            FROM detections
+            WHERE ts >= NOW() - INTERVAL '5 minutes'
+        """)
+    )
+    row = result.first()
+    total_5m = row[0] if row else 0
+    high_critical_5m = row[1] if row else 0
+    
+    # Threat intensity formula: weighted score clamped 0-100
+    # High/Critical events have 12x weight, all events have 2x weight
+    intensity = min(100, max(0, (high_critical_5m * 12) + (total_5m * 2)))
+    
+    analytics["summary"] = {
+        "total_24h": total_window,
+        "high_critical_24h": high_critical_window,
+        "unique_devices": unique_devices,
+        "unique_attackers": unique_attackers,
+        "total_5m": total_5m,
+        "high_critical_5m": high_critical_5m,
+        "intensity": intensity
+    }
+    
+    return analytics

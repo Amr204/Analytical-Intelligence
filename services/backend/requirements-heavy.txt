@@ -1,0 +1,4 @@
+# Heavy dependencies - ML/Data Science (rarely change)
+# These are installed first for better Docker layer caching
+numpy>=1.26.0,<2.0.0
+tensorflow>=2.15.0,<3.0.0

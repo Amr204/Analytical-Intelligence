@@ -7,16 +7,19 @@ import os
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.models_loader import load_all_models
 from app.schemas import HealthResponse
 from app.ui import router as ui_router
-from app.ingest import auth_router, flow_router
+from app.ingest import auth_router, suricata_router
+from app.db import ensure_schema
 
 # Configure logging
 logging.basicConfig(
@@ -34,17 +37,24 @@ async def lifespan(app: FastAPI):
     logger.info("Analytical-Intelligence v1 Starting...")
     logger.info("=" * 50)
     
+    # Run database schema migration
+    try:
+        await ensure_schema()
+        logger.info("Database schema migration completed")
+    except Exception as e:
+        logger.error(f"Database schema migration failed: {e}")
+        # Continue anyway - tables may already exist
+    
     # Load ML models
-    ssh_loaded, network_loaded = load_all_models()
+    ssh_loaded = load_all_models()
     
     logger.info("-" * 50)
     logger.info("Model Status:")
     logger.info(f"  SSH LSTM:     {'LOADED' if ssh_loaded else 'NOT LOADED'}")
-    logger.info(f"  Network RF:   {'LOADED' if network_loaded else 'NOT LOADED'}")
     logger.info("-" * 50)
     
-    if not ssh_loaded and not network_loaded:
-        logger.warning("No ML models loaded - detection capabilities limited")
+    if not ssh_loaded:
+        logger.warning("SSH ML model not loaded - SSH detection capabilities limited")
     
     # Initialize NotificationBus
     from app.notifications import NotificationBus, set_notification_bus
@@ -91,13 +101,56 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+
+# Paths that don't require login
+PUBLIC_PATHS = {"/login", "/logout"}
+PUBLIC_PREFIXES = ("/static/", "/api/")
+
+
+from starlette.middleware.base import BaseHTTPMiddleware
+
+
+class RequireLoginMiddleware(BaseHTTPMiddleware):
+    """Middleware to require login for UI routes."""
+    
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        
+        # Skip auth check for public paths and prefixes
+        if path in PUBLIC_PATHS or any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
+            return await call_next(request)
+        
+        # Check if user is logged in
+        user_id = request.session.get("user_id")
+        if not user_id:
+            # Redirect to login with next parameter
+            next_url = str(request.url)
+            login_url = f"/login?{urlencode({'next': next_url})}"
+            return RedirectResponse(url=login_url, status_code=303)
+        
+        return await call_next(request)
+
+
+# IMPORTANT: Middleware order is LIFO (last-in-first-out)
+# So we add RequireLoginMiddleware FIRST, then SessionMiddleware
+# This means SessionMiddleware runs FIRST (sets up session), then RequireLoginMiddleware runs
+app.add_middleware(RequireLoginMiddleware)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.ui_session_secret,
+    session_cookie="ai_session",
+    max_age=86400,  # 24 hours
+)
+
+
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Include routers
 app.include_router(ui_router)
 app.include_router(auth_router)
-app.include_router(flow_router)
+
+app.include_router(suricata_router)
 
 
 @app.get("/api/v1/health", response_model=HealthResponse, tags=["system"])
@@ -110,9 +163,47 @@ async def health_check():
     )
 
 
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.templating import Jinja2Templates
+
+# Templates for error pages
+error_templates = Jinja2Templates(directory="app/templates")
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Handle HTTP exceptions (404, etc.) - don't convert to 500."""
+    # For API routes, return JSON
+    if request.url.path.startswith("/api/"):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail or "Error"}
+        )
+    
+    # For UI routes, return HTML error page
+    template_name = "404.html" if exc.status_code == 404 else "error.html"
+    try:
+        return error_templates.TemplateResponse(
+            template_name,
+            {
+                "request": request,
+                "message": exc.detail or f"Error {exc.status_code}",
+                "status_code": exc.status_code,
+                "page_title": f"Error {exc.status_code}"
+            },
+            status_code=exc.status_code
+        )
+    except Exception:
+        # Fallback if template not found
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail or "Error"}
+        )
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler."""
+    """Global exception handler for unexpected errors only."""
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,

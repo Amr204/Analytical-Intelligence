@@ -3,94 +3,212 @@
 {% block content %}
 <div class="page-content">
     <div class="page-header">
-        <h1>📡 Devices</h1>
+        <h1><svg class="icon icon-lg">
+                <use xlink:href="/static/icons.svg#icon-server" />
+            </svg> Devices</h1>
         <p class="subtitle">Registered sensor devices and their status</p>
     </div>
 
     <!-- Stats Summary -->
-    <div class="stats-grid" style="margin-bottom: var(--spacing-xl);">
+    <div class="stats-row">
         <div class="stat-card info-card">
-            <span class="stat-icon">📡</span>
+            <div class="stat-icon">
+                <svg class="icon icon-lg">
+                    <use xlink:href="/static/icons.svg#icon-server" />
+                </svg>
+            </div>
             <div class="stat-content">
                 <span class="stat-value">{{ devices|length }}</span>
                 <span class="stat-label">Total Devices</span>
             </div>
         </div>
-        <div class="stat-card">
-            <span class="stat-icon">🟢</span>
+        <div class="stat-card success-card">
+            <div class="stat-icon">
+                <svg class="icon icon-lg">
+                    <use xlink:href="/static/icons.svg#icon-check" />
+                </svg>
+            </div>
             <div class="stat-content">
-                <span class="stat-value">{{ devices|selectattr('status', 'equalto', 'online')|list|length }}</span>
-                <span class="stat-label">Online</span>
+                <span class="stat-value">{{ devices|selectattr('approval_status', 'equalto', 'allowed')|list|length
+                    }}</span>
+                <span class="stat-label">Allowed</span>
             </div>
         </div>
         <div class="stat-card warning-card">
-            <span class="stat-icon">🔴</span>
+            <div class="stat-icon">
+                <svg class="icon icon-lg">
+                    <use xlink:href="/static/icons.svg#icon-clock" />
+                </svg>
+            </div>
             <div class="stat-content">
-                <span class="stat-value">{{ devices|selectattr('status', 'equalto', 'offline')|list|length }}</span>
-                <span class="stat-label">Offline</span>
+                <span class="stat-value">{{ devices|selectattr('approval_status', 'equalto', 'pending')|list|length
+                    }}</span>
+                <span class="stat-label">Pending</span>
+            </div>
+        </div>
+        <div class="stat-card danger-card">
+            <div class="stat-icon">
+                <svg class="icon icon-lg">
+                    <use xlink:href="/static/icons.svg#icon-x" />
+                </svg>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">{{ devices|selectattr('approval_status', 'equalto', 'blocked')|list|length
+                    }}</span>
+                <span class="stat-label">Blocked</span>
             </div>
         </div>
     </div>
 
     <!-- Devices Grid -->
     {% if devices %}
-    <div class="models-grid">
+    <div class="devices-grid">
         {% for device in devices %}
-        <div class="model-card">
-            <div class="model-header">
-                <div class="model-icon">📡</div>
-                <div class="model-title">
-                    <h3>{{ device.device_id }}</h3>
-                    <span class="model-subtitle">{{ device.hostname or 'Unknown Host' }}</span>
+        <div
+            class="device-card{% if device.approval_status == 'blocked' %} device-blocked{% elif device.approval_status == 'pending' %} device-pending{% endif %}">
+            <div class="device-header">
+                <div class="device-icon">
+                    <svg class="icon icon-xl">
+                        <use xlink:href="/static/icons.svg#icon-server" />
+                    </svg>
                 </div>
-                {% if device.status == 'online' %}
-                <span class="model-status status-loaded">● Online</span>
-                {% else %}
-                <span class="model-status status-not-loaded">● Offline</span>
-                {% endif %}
+                <div class="device-title">
+                    <h3>{{ device.device_id }}</h3>
+                    <span class="device-hostname">{{ device.hostname or 'Unknown Host' }}</span>
+                </div>
+                <div class="device-badges">
+                    <!-- Approval Status Badge -->
+                    {% if device.approval_status == 'allowed' %}
+                    <span class="approval-badge approval-allowed" title="Events are being collected">
+                        <svg class="icon icon-xs">
+                            <use xlink:href="/static/icons.svg#icon-check" />
+                        </svg>
+                        Allowed
+                    </span>
+                    {% elif device.approval_status == 'blocked' %}
+                    <span class="approval-badge approval-blocked"
+                        title="{{ device.blocked_reason or 'Device is blocked' }}">
+                        <svg class="icon icon-xs">
+                            <use xlink:href="/static/icons.svg#icon-x" />
+                        </svg>
+                        Blocked
+                    </span>
+                    {% else %}
+                    <span class="approval-badge approval-pending" title="Awaiting approval - no events collected">
+                        <svg class="icon icon-xs">
+                            <use xlink:href="/static/icons.svg#icon-clock" />
+                        </svg>
+                        Pending
+                    </span>
+                    {% endif %}
+
+                    <!-- Online/Offline Status -->
+                    {% if device.status == 'online' %}
+                    <span class="device-status status-online">
+                        <span class="status-indicator online"></span>
+                        Online
+                    </span>
+                    {% else %}
+                    <span class="device-status status-offline">
+                        <span class="status-indicator offline"></span>
+                        Offline
+                    </span>
+                    {% endif %}
+                </div>
             </div>
 
-            <div class="model-details">
+            <div class="device-details">
                 <div class="detail-row">
-                    <span class="detail-label">IP Address</span>
+                    <span class="detail-label">
+                        <svg class="icon icon-sm">
+                            <use xlink:href="/static/icons.svg#icon-globe" />
+                        </svg>
+                        IP Address
+                    </span>
                     <span class="detail-value">{{ device.ip or 'N/A' }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Last Seen</span>
+                    <span class="detail-label">
+                        <svg class="icon icon-sm">
+                            <use xlink:href="/static/icons.svg#icon-clock" />
+                        </svg>
+                        Last Seen
+                    </span>
                     <span class="detail-value timestamp">{{ device.last_seen[:19] if device.last_seen else 'Never'
                         }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Alerts (24h)</span>
+                    <span class="detail-label">
+                        <svg class="icon icon-sm">
+                            <use xlink:href="/static/icons.svg#icon-alerts" />
+                        </svg>
+                        Alerts (24h)
+                    </span>
                     <span class="detail-value">
                         {% if device.alerts_count_24h > 0 %}
-                        <span style="color: var(--neon-red);">{{ device.alerts_count_24h }}</span>
+                        <span class="text-danger">{{ device.alerts_count_24h }}</span>
                         {% else %}
-                        <span style="color: var(--neon-green);">0</span>
+                        <span class="text-success">0</span>
                         {% endif %}
                     </span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Alerts (1h)</span>
+                    <span class="detail-label">
+                        <svg class="icon icon-sm">
+                            <use xlink:href="/static/icons.svg#icon-clock" />
+                        </svg>
+                        Alerts (1h)
+                    </span>
                     <span class="detail-value">
                         {% if device.alerts_count_1h > 0 %}
-                        <span style="color: var(--neon-orange);">{{ device.alerts_count_1h }}</span>
+                        <span class="text-warning">{{ device.alerts_count_1h }}</span>
                         {% else %}
-                        <span style="color: var(--neon-green);">0</span>
+                        <span class="text-success">0</span>
                         {% endif %}
                     </span>
                 </div>
                 {% if device.role %}
                 <div class="detail-row">
-                    <span class="detail-label">Role</span>
+                    <span class="detail-label">
+                        <svg class="icon icon-sm">
+                            <use xlink:href="/static/icons.svg#icon-user" />
+                        </svg>
+                        Role
+                    </span>
                     <span class="detail-value">{{ device.role }}</span>
                 </div>
                 {% endif %}
             </div>
 
-            <div class="model-actions">
-                <a href="/devices/{{ device.device_id }}" class="btn btn-primary btn-sm">View Details</a>
-                <a href="/alerts?device_id={{ device.device_id }}" class="btn btn-secondary btn-sm">View Alerts</a>
+            <div class="device-actions">
+                <!-- Approval Actions -->
+                {% if device.approval_status != 'allowed' %}
+                <form method="post" action="/devices/{{ device.device_id }}/allow" style="display:inline;">
+                    <button type="submit" class="btn btn-success btn-sm" title="Allow device to send events">
+                        <svg class="icon icon-sm">
+                            <use xlink:href="/static/icons.svg#icon-check" />
+                        </svg>
+                        Allow
+                    </button>
+                </form>
+                {% endif %}
+                {% if device.approval_status != 'blocked' %}
+                <form method="post" action="/devices/{{ device.device_id }}/block" style="display:inline;">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Block device from sending events">
+                        <svg class="icon icon-sm">
+                            <use xlink:href="/static/icons.svg#icon-x" />
+                        </svg>
+                        Block
+                    </button>
+                </form>
+                {% endif %}
+
+                <a href="/devices/{{ device.device_id }}" class="btn btn-primary btn-sm">
+                    <svg class="icon icon-sm">
+                        <use xlink:href="/static/icons.svg#icon-eye" />
+                    </svg>
+                    Details
+                </a>
             </div>
         </div>
         {% endfor %}
@@ -98,12 +216,204 @@
     {% else %}
     <div class="section-card">
         <div class="empty-state">
-            <p>🔍 No devices registered yet</p>
-            <p style="font-size: 0.9rem; margin-top: var(--spacing-sm);">
-                Devices will appear here once sensors start sending data.
-            </p>
+            <svg class="icon icon-xl">
+                <use xlink:href="/static/icons.svg#icon-search" />
+            </svg>
+            <p>No devices registered yet</p>
+            <p class="empty-subtext">Devices will appear here once sensors start sending data.</p>
         </div>
     </div>
     {% endif %}
 </div>
+
+<style>
+    /* Devices Grid */
+    .devices-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: var(--spacing-lg);
+    }
+
+    .device-card {
+        background: var(--bg-card);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--glass-border);
+        padding: var(--spacing-lg);
+        transition: all 0.3s ease;
+    }
+
+    .device-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-card);
+        border-color: var(--neon-green);
+    }
+
+    .device-header {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--spacing-md);
+        margin-bottom: var(--spacing-md);
+        padding-bottom: var(--spacing-md);
+        border-bottom: 1px solid var(--glass-border);
+    }
+
+    .device-icon {
+        color: var(--cyber-blue);
+    }
+
+    .device-title {
+        flex: 1;
+    }
+
+    .device-title h3 {
+        font-family: var(--font-display);
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .device-hostname {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .device-status {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-xs);
+        font-size: 0.8rem;
+        padding: 4px 8px;
+        border-radius: var(--radius-sm);
+    }
+
+    .status-online {
+        background: var(--severity-low-bg);
+        color: var(--severity-low);
+    }
+
+    .status-offline {
+        background: var(--severity-critical-bg);
+        color: var(--severity-critical);
+    }
+
+    .device-details {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-xs);
+    }
+
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--spacing-xs) 0;
+    }
+
+    .detail-label {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-xs);
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+
+    .detail-value {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        color: var(--text-primary);
+    }
+
+    .device-actions {
+        display: flex;
+        gap: var(--spacing-sm);
+        margin-top: var(--spacing-md);
+        padding-top: var(--spacing-md);
+        border-top: 1px solid var(--glass-border);
+    }
+
+    .device-actions .btn {
+        flex: 1;
+    }
+
+    .text-danger {
+        color: var(--neon-red);
+    }
+
+    .text-warning {
+        color: var(--neon-orange);
+    }
+
+    .text-success {
+        color: var(--neon-green);
+    }
+
+    /* Stats Row */
+    .stats-row {
+        display: flex;
+        gap: var(--spacing-lg);
+        margin-bottom: var(--spacing-xl);
+        flex-wrap: wrap;
+    }
+
+    .stat-card {
+        flex: 1;
+        min-width: 150px;
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-md);
+        background: var(--bg-card);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-lg);
+        border: 1px solid var(--glass-border);
+    }
+
+    .stat-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-md);
+        background: var(--bg-elevated);
+    }
+
+    .stat-icon .status-indicator {
+        width: 16px;
+        height: 16px;
+    }
+
+    .stat-content {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .stat-value {
+        font-family: var(--font-display);
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .stat-label {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+
+    .empty-subtext {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin-top: var(--spacing-sm);
+    }
+
+    @media (max-width: 768px) {
+        .devices-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .stats-row {
+            flex-direction: column;
+        }
+    }
+</style>
 {% endblock %}

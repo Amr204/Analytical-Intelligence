@@ -27,14 +27,14 @@ Analytical-Intelligence is a mini-SIEM system that detects security threats in r
 | **Backend** | FastAPI server with ML detection + UI |
 | **PostgreSQL** | Event and detection storage |
 | **Auth Collector** | Monitors `/var/log/auth.log` for SSH events |
-| **Flow Collector** | Captures network flows with NFStream |
+| **Suricata Collector** | Captures network threats using Suricata IDS |
 
 ### Models
 
 | Model | File Location | Detects |
 |-------|---------------|---------|
 | SSH LSTM | `models/ssh/ssh_lstm.joblib` | SSH brute force |
-| Network RF | `models/RF/random_forest.joblib` | DoS, DDoS, Port Scanning, Brute Force |
+
 
 ---
 
@@ -97,18 +97,18 @@ Analytical-Intelligence is a mini-SIEM system that detects security threats in r
 └──────────────────┘
 ```
 
-### 2. Network Flow Processing
+### 2. Suricata Event Processing
 
 ```
 Network Interface (ens33)
          │
          ▼
 ┌──────────────────┐
-│  flow_collector  │  NFStream captures flows
+│suricata_collector│  Suricata IDS detects threats
 │  (host network)  │
 └────────┬─────────┘
          │
-         │  POST /api/v1/ingest/flow
+         │  POST /api/v1/ingest/suricata
          │  Headers: INGEST_API_KEY
          ▼
 ┌──────────────────┐
@@ -116,13 +116,7 @@ Network Interface (ens33)
 │                  │
 │  1. Verify API key
 │  2. Register device
-│  3. Store raw event
-│  4. Run Network RF detector
-│     - Extract features
-│     - Classify with Random Forest
-│     - Apply gating layer (PPS check)
-│     - Dedup + cooldown
-│  5. Store detection
+│  3. Store detection
 └──────────────────┘
 ```
 
@@ -148,7 +142,6 @@ services:
       - "8000:8000"
     volumes:
       - ./models/ssh:/app/models/ssh:ro
-      - ./models/RF:/app/models/RF:ro
     depends_on:
       postgres: { condition: service_healthy }
 
@@ -170,11 +163,11 @@ services:
     volumes:
       - /var/log/auth.log:/var/log/auth.log:ro
 
-  flow_collector:
-    build: ./agents/flow_collector
-    container_name: ai_db-flow-collector
+  suricata_collector:
+    build: ./agents/suricata_collector
+    container_name: ai_db-suricata-collector
     network_mode: host
-    cap_add: [NET_ADMIN, NET_RAW]
+    cap_add: [NET_ADMIN, NET_RAW, SYS_NICE]
 ```
 
 ---
@@ -202,11 +195,10 @@ Analytical-Intelligence/
 │           │
 │           ├── ingest/          ◄── Ingestion endpoints
 │           │   ├── auth_ingest.py
-│           │   └── flow_ingest.py
+│           │   └── suricata_ingest.py
 │           │
 │           ├── detectors/       ◄── ML detectors
-│           │   ├── ssh_lstm_detector.py
-│           │   └── network_ml_detector.py
+│           │   └── ssh_lstm_detector.py
 │           │
 │           ├── ui/              ◄── Web UI routes
 │           │   └── routes.py
@@ -219,9 +211,9 @@ Analytical-Intelligence/
 │   │   ├── Dockerfile
 │   │   └── agent.py             ◄── Auth collector entrypoint
 │   │
-│   ├── flow_collector/
+│   ├── suricata_collector/
 │   │   ├── Dockerfile
-│   │   └── agent.py             ◄── Flow collector entrypoint
+│   │   └── agent.py             ◄── Suricata collector entrypoint
 │   │
 │   └── common/                  ◄── Shared utilities
 │
@@ -229,10 +221,7 @@ Analytical-Intelligence/
 │   ├── ssh/
 │   │   └── ssh_lstm.joblib      ◄── SSH detection model
 │   │
-│   └── RF/
-│       ├── random_forest.joblib ◄── Network classification model
-│       ├── feature_list.json
-│       └── label_map.json
+
 │
 ├── scripts/
 │   ├── analysis_up.sh           ◄── Start analysis stack
@@ -254,7 +243,7 @@ Analytical-Intelligence/
 | `scripts/init_db.sql` | PostgreSQL on first start | Create database tables |
 | `services/backend/app/main.py` | Uvicorn in container | FastAPI application |
 | `agents/auth_collector/agent.py` | Docker container | Auth log monitoring |
-| `agents/flow_collector/agent.py` | Docker container | Network flow capture |
+| `agents/suricata_collector/agent.py` | Docker container | Suricata evasion detection |
 
 ---
 
@@ -273,7 +262,7 @@ Analytical-Intelligence/
 |--------|---------|-------------|
 | `postgres_data` | Database storage | Survives container restarts |
 | `./models/ssh` | SSH model (read-only bind) | Host filesystem |
-| `./models/RF` | Network model (read-only bind) | Host filesystem |
+
 
 ### Port Mapping
 

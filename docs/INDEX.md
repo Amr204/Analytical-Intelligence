@@ -32,12 +32,10 @@ Updating the system?  → UPGRADES.md
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design, data flow, Docker structure | Developers |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Comprehensive problem-solving runbook | All users |
 | [UPGRADES.md](UPGRADES.md) | How to update the system safely | Operators |
-| [ML.md](ML.md) | ML models, thresholds, allowlist policy | Developers |
 | [SECURITY.md](SECURITY.md) | Firewall modes, API keys, hardening | Security admins |
 | [TELEGRAM.md](TELEGRAM.md) | Telegram alerting integration & setup | Operators |
 | [GIT_WORKFLOW.md](GIT_WORKFLOW.md) | Git best practices & standard workflow | Developers |
 | [TESTING.md](TESTING.md) | Network RF pipeline validation guide | Developers |
-| [REPORTS.md](REPORTS.md) | Reports generation & analysis | Developers |
 
 ---
 
@@ -76,12 +74,6 @@ Comprehensive runbook covering:
 - Safe update procedure
 - When to rebuild containers
 - Rollback procedure
-
-### [ML.md](ML.md)
-- SSH LSTM model (brute force)
-- Network RF model (DoS, DDoS, Port Scanning, Brute Force)
-- Threshold tuning
-- Allowlist configuration
 
 ### [SECURITY.md](SECURITY.md)
 - UFW firewall configurations

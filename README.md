@@ -29,7 +29,8 @@ A real-time security threat detection system using:
 | Component | Function | Accuracy |
 |-----------|----------|----------|
 | **SSH LSTM** | SSH Brute Force detection | High |
-| **Network RF** | Network traffic classification (Random Forest) | 96% F1-Score |
+| **Suricata IDS** | Network Signature Detection (DoS, Scan, Malware) | High |
+
 
 ### 🎯 Detected Attack Types
 
@@ -300,17 +301,7 @@ ls -la models/ssh/
 -rw-rw-r-- 1 user user XXXXX Jan 16 10:00 ssh_lstm.joblib
 ```
 
-```bash
-# Check Network RF model
-ls -la models/RF/
-```
 
-**Expected result:**
-```
--rw-rw-r-- 1 user user XXXXX Jan 16 10:00 random_forest.joblib
--rw-rw-r-- 1 user user XXXXX Jan 16 10:00 feature_list.json
--rw-rw-r-- 1 user user XXXXX Jan 16 10:00 label_map.json
-```
 
 ### Step 7: Configure Environment
 
@@ -357,7 +348,7 @@ Analytical-Intelligence Analysis Stack Startup
 
 Checking ML models...
   ✓ SSH LSTM model found
-  ✓ Network RF model found
+
 
 Starting Analysis Stack...
 [+] Running 2/2
@@ -641,7 +632,8 @@ docker ps
 ```
 CONTAINER ID   IMAGE                     STATUS         NAMES
 xxx            ai_db-auth-collector     Up 1 minute    ai_db-auth-collector
-xxx            ai_db-flow-collector     Up 1 minute    ai_db-flow-collector
+xxx            ai_db-suricata           Up 1 minute    ai_db-suricata
+xxx            ai_db-suricata-collector Up 1 minute    ai_db-suricata-collector
 ```
 
 ### Step 9: Watch Logs
@@ -793,8 +785,7 @@ ORDER BY count DESC;
 ```
  model_name | label          | severity | count
 ------------+----------------+----------+-------
- network_rf | Port Scanning  | MEDIUM   |    15
- network_rf | DoS            | HIGH     |     8
+
  ssh_lstm   | Brute Force    | CRITICAL |     5
 ```
 
@@ -808,8 +799,7 @@ docker logs -f ai_db-backend
 
 **You will see messages like:**
 ```
-INFO:     Network RF detection: DoS (HIGH)
-INFO:     Network RF detection DEDUP: DoS (x3)
+INFO:     suricata_ingest: Alert received: ET SCAN Potential SSH Scan
 INFO:     SSH detection: Brute Force attempt detected
 ```
 
@@ -939,28 +929,13 @@ Or use the "Device" dropdown in page filters.
 
 ## ⚙️ Advanced Settings
 
-### Customize Detected Attacks (Allowlist)
 
-The system stores only these attacks by default:
-- DoS
-- DDoS
-- Port Scanning
-- Brute Force
-
-**To change the list (in .env on Analysis Server):**
-```bash
-# Add Bots and Web Attacks:
-NETWORK_LABEL_ALLOWLIST=DoS,DDoS,Port Scanning,Brute Force,Bots,Web Attacks
-
-# Or reduce the list:
-NETWORK_LABEL_ALLOWLIST=DDoS,DoS
-```
 
 ### Adjust Detection Sensitivity
 
 ```bash
-# Network ML confidence threshold (default: 0.60)
-NETWORK_ML_THRESHOLD=0.60
+# Suricata Noise Profile (balanced, low-noise, aggressive)
+SURICATA_PROFILE=balanced
 
 # Failed attempts to trigger SSH alert
 SSH_BRUTEFORCE_THRESHOLD=5
@@ -991,7 +966,7 @@ Includes:
 |---------|-----------|
 | Dashboard doesn't open | `sudo ufw allow 8000` |
 | Sensor doesn't connect | Check `ANALYZER_HOST` in `.env` |
-| No alerts | Lower `NETWORK_ML_THRESHOLD=0.50` |
+| No alerts | Check `SURICATA_PROFILE` in `.env` |
 | Container doesn't start | `docker compose logs backend` |
 | DNS fails during build | `bash scripts/docker_doctor.sh` or [use VPN](#-optional-vpn-for-updates) |
 
@@ -1063,11 +1038,12 @@ sudo ./scripts/ai-vpn.sh stop
 │                                                              │
 │   Models:                                                    │
 │   ├── SSH LSTM (Brute Force Detection)                      │
-│   └── Network RF (DoS, DDoS, Port Scanning, Brute Force)    │
+│   └── Suricata IDS (Signature-based Network Detection)      │
 │                                                              │
 │   Sensors:                                                   │
 │   ├── auth_collector (SSH logs)                             │
-│   └── flow_collector (Network flows)                        │
+│   ├── suricata (Network IDS)                                │
+│   └── suricata_collector (Alert shipper)                    │
 │                                                              │
 │   UI: http://<ANALYZER_IP>:8000                             │
 │   ├── /           → Dashboard                               │

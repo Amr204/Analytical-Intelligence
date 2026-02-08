@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Analytical-Intelligence{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <svg class="icon icon-xl">
+                <use xlink:href="/static/icons.svg#icon-suricata" />
+            </svg>
+            <h1 class="login-title">Analytical-Intelligence</h1>
+            <p class="login-subtitle">Security Intelligence Platform</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error">
+            <svg class="icon">
+                <use xlink:href="/static/icons.svg#icon-alerts" />
+            </svg>
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <form method="post" action="/login" class="login-form">
+            <input type="hidden" name="next" value="{{ next }}">
+
+            <div class="form-group">
+                <label for="username" class="form-label">Username</label>
+                <div class="input-wrapper">
+                    <svg class="icon input-icon">
+                        <use xlink:href="/static/icons.svg#icon-models" />
+                    </svg>
+                    <input type="text" id="username" name="username" class="form-input"
+                        placeholder="Enter your username" required autocomplete="username" autofocus>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="password" class="form-label">Password</label>
+                <div class="input-wrapper">
+                    <svg class="icon input-icon">
+                        <use xlink:href="/static/icons.svg#icon-activity" />
+                    </svg>
+                    <input type="password" id="password" name="password" class="form-input"
+                        placeholder="Enter your password" required autocomplete="current-password">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg btn-block">
+                <svg class="icon">
+                    <use xlink:href="/static/icons.svg#icon-login" />
+                </svg>
+                <span>Sign In</span>
+            </button>
+        </form>
+
+        <div class="login-footer">
+            <p class="login-hint">Contact your administrator for access credentials.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

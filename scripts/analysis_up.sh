@@ -60,13 +60,8 @@ else
     echo "    Copy from: models/Host-Model/ssh_lstm.joblib"
 fi
 
-NETWORK_MODEL="models/RF/random_forest.joblib"
-if [ -f "$NETWORK_MODEL" ]; then
-    echo "  ✓ Network RF model found"
-else
-    echo "  ⚠ Network RF model not found at $NETWORK_MODEL"
-    echo "    The RF model should be in models/RF/"
-fi
+# Note: Network RF model was removed from the codebase.
+# Only SSH LSTM model is currently used for ML detection.
 
 # Print configuration
 echo ""

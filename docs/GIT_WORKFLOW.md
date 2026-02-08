@@ -67,7 +67,7 @@ Format: `type: description`
 | Type | Description | Example |
 |------|-------------|---------|
 | `feat` | New feature | `feat: add alerting for port scanning` |
-| `fix` | Bug fix | `fix: correct threshold in RF model` |
+| `fix` | Bug fix | `fix: correct threshold in SSH model` |
 | `docs` | Documentation | `docs: update troubleshooting runbook` |
 | `chore` | Maintenance | `chore: update .gitignore for models` |
 | `refactor`| Code structure | `refactor: split ingest router` |
@@ -81,15 +81,11 @@ Format: `type: description`
 > [!WARNING]
 > Do NOT commit large model files (`.joblib`) directly to Git!
 
-- **Policy**: `random_forest.joblib` (~65MB) is ignored via `.gitignore`.
+- **Policy**: `ssh_lstm.joblib` is small enough, but in general, avoid committing large binary files.
 - **How to manage**:
-  - Keep models in `models/RF/` locally.
+  - Keep models in `models/` locally.
   - Backup models externally (S3, Drive, or separate LFS repo).
-  - If LFS is absolutely needed:
-    ```bash
-    git lfs install
-    git lfs track "*.joblib"
-    ```
+
 
 ### B. Secrets (.env)
 > [!DANGER]

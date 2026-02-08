@@ -3,8 +3,10 @@
 {% block content %}
 <div class="page-content">
     <div class="page-header">
-        <h1>🚨 Security Alerts</h1>
-        <p class="subtitle">All detections from SSH LSTM and Network RF models</p>
+        <h1><svg class="icon icon-lg">
+                <use xlink:href="/static/icons.svg#icon-alerts" />
+            </svg> Security Alerts</h1>
+        <p class="subtitle">All detections from SSH LSTM and Suricata IDS</p>
     </div>
 
     <!-- Filters -->
@@ -26,7 +28,7 @@
                     <option value="">All</option>
                     <option value="ssh_lstm" {% if filters.model_name=='ssh_lstm' %}selected{% endif %}>SSH LSTM
                     </option>
-                    <option value="network_rf" {% if filters.model_name=='network_rf' %}selected{% endif %}>Network RF
+                    <option value="suricata" {% if filters.model_name=='suricata' %}selected{% endif %}>Suricata
                     </option>
                 </select>
             </div>
@@ -63,7 +65,12 @@
                     <option value="1440" {% if filters.last_minutes==1440 %}selected{% endif %}>Last 24 hours</option>
                 </select>
             </div>
-            <button type="submit" class="btn btn-primary">Apply Filters</button>
+            <button type="submit" class="btn btn-primary">
+                <svg class="icon">
+                    <use xlink:href="/static/icons.svg#icon-filter" />
+                </svg>
+                Apply
+            </button>
             <a href="/alerts" class="btn btn-secondary">Clear</a>
         </form>
     </div>
@@ -86,41 +93,92 @@
                     <th>Severity</th>
                     <th>Model</th>
                     <th>Label</th>
+                    <th>Flow</th>
                     <th>Device</th>
-                    <th>Score</th>
                     <th>Details</th>
                 </tr>
             </thead>
             <tbody>
                 {% for d in detections %}
-                <tr class="severity-row-{{ d.severity|lower }}">
+                <tr class="severity-row-{{ d.severity|default('low')|lower }}">
                     <td>{{ d.id }}</td>
-                    <td class="timestamp">{{ d.ts[:19] }}</td>
-                    <td><span class="severity-badge {{ d.severity|lower }}">{{ d.severity }}</span></td>
-                    <td><span class="model-badge {{ d.model_name }}">{{ d.model_name }}</span></td>
-                    <td class="label-cell" title="{{ d.label }}">{{ d.label[:60] }}{% if d.label|length > 60 %}...{%
-                        endif %}</td>
-                    <td><a href="/devices/{{ d.device_id }}">{{ d.device_id }}</a></td>
-                    <td>{{ "%.2f"|format(d.score) }}</td>
+                    <td class="timestamp">{{ (d.ts or '-')[:19] }}</td>
+                    <td><span class="severity-badge {{ d.severity|default('low')|lower }}">{{ d.severity|default('N/A')
+                            }}</span></td>
+                    <td><span class="model-badge {{ d.model_name|default('unknown') }}">{{
+                            d.model_name|default('unknown') }}</span></td>
+                    <td class="label-cell" title="{{ d.label|default('') }}">{{ (d.label or '-')[:60] }}{% if d.label
+                        and d.label|length > 60 %}...{% endif %}</td>
+                    <td class="flow-cell">{% if d.src_ip %}{{ d.src_ip }}:{{ d.src_port|default('?') }} → {{
+                        d.dst_ip|default('?') }}:{{ d.dst_port|default('?') }}{% else %}-{% endif %}</td>
+                    <td><a href="/devices/{{ d.device_id|default('unknown') }}">{{ d.device_id|default('N/A') }}</a>
+                    </td>
                     <td>
-                        <button class="btn btn-sm btn-info" data-details="{{ d.details|tojson|e }}"
-                            onclick="showDetails(this.dataset.details)">View</button>
+                        <button class="btn btn-sm btn-info" data-details="{{ d.details_json | e }}"
+                            onclick="showDetails(this.dataset.details)">
+                            <svg class="icon icon-sm">
+                                <use xlink:href="/static/icons.svg#icon-eye" />
+                            </svg>
+                            View
+                        </button>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8" class="empty-state">No alerts found matching the filters</td>
+                    <td colspan="8" class="empty-state">
+                        <svg class="icon icon-xl">
+                            <use xlink:href="/static/icons.svg#icon-check" />
+                        </svg>
+                        <span>No alerts found matching the filters</span>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    <!-- Pagination -->
+    {% if pagination %}
+    <div class="pagination">
+        {% if pagination.page > 1 %}
+        <a href="?page=1{{ pagination.query_string }}" class="page-btn">
+            <svg class="icon icon-sm">
+                <use xlink:href="/static/icons.svg#icon-chevrons-left" />
+            </svg>
+        </a>
+        <a href="?page={{ pagination.page - 1 }}{{ pagination.query_string }}" class="page-btn">
+            <svg class="icon icon-sm">
+                <use xlink:href="/static/icons.svg#icon-chevron-left" />
+            </svg>
+        </a>
+        {% endif %}
+
+        <span class="page-info">Page {{ pagination.page }} of {{ pagination.total_pages }}</span>
+
+        {% if pagination.page < pagination.total_pages %} <a
+            href="?page={{ pagination.page + 1 }}{{ pagination.query_string }}" class="page-btn">
+            <svg class="icon icon-sm">
+                <use xlink:href="/static/icons.svg#icon-chevron-right" />
+            </svg>
+            </a>
+            <a href="?page={{ pagination.total_pages }}{{ pagination.query_string }}" class="page-btn">
+                <svg class="icon icon-sm">
+                    <use xlink:href="/static/icons.svg#icon-chevrons-right" />
+                </svg>
+            </a>
+            {% endif %}
+    </div>
+    {% endif %}
 </div>
 
 <!-- Details Modal -->
 <div id="details-modal" class="modal">
     <div class="modal-content">
-        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <button class="modal-close" onclick="closeModal()">
+            <svg class="icon">
+                <use xlink:href="/static/icons.svg#icon-x" />
+            </svg>
+        </button>
         <h3>Alert Details</h3>
         <pre id="details-json"></pre>
     </div>
@@ -146,5 +204,12 @@
             modal.style.display = 'none';
         }
     }
+
+    // Keyboard close
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            closeModal();
+        }
+    });
 </script>
 {% endblock %}

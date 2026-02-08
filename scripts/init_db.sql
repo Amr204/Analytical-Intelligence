@@ -12,7 +12,12 @@ CREATE TABLE IF NOT EXISTS devices (
     -- Optional metadata
     os TEXT,
     role TEXT,
-    tags TEXT
+    tags TEXT,
+    -- Device approval workflow
+    approval_status TEXT NOT NULL DEFAULT 'pending',  -- pending | allowed | blocked
+    approved_at TIMESTAMPTZ NULL,
+    approved_by TEXT NULL,
+    blocked_reason TEXT NULL
 );
 
 -- Raw events table - all incoming events stored as-is
@@ -48,6 +53,29 @@ CREATE TABLE IF NOT EXISTS detections (
 );
 
 -- =====================================================
+-- Users table - UI login only (no UI signup)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS users (
+    id BIGSERIAL PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    full_name TEXT NULL,
+    password_hash TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_login TIMESTAMPTZ NULL
+);
+
+-- User login state for lockout tracking
+CREATE TABLE IF NOT EXISTS user_login_state (
+    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    failed_count INT NOT NULL DEFAULT 0,
+    lock_level INT NOT NULL DEFAULT 0,      -- 0=none, 1=5min lock, 2=1h lock
+    lock_until TIMESTAMPTZ NULL,
+    last_failed TIMESTAMPTZ NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =====================================================
 -- Indexes for raw_events
 -- =====================================================
 CREATE INDEX IF NOT EXISTS idx_raw_events_ts ON raw_events(ts DESC);
@@ -73,6 +101,14 @@ CREATE INDEX IF NOT EXISTS idx_detections_network_dedup
 -- Indexes for devices
 -- =====================================================
 CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON devices(last_seen DESC);
+CREATE INDEX IF NOT EXISTS idx_devices_approval_status ON devices(approval_status);
+
+-- =====================================================
+-- Indexes for users
+-- =====================================================
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 
 -- Note: Devices are registered dynamically when sensors first connect.
 -- The `ensure_device()` function in db.py handles device registration and last_seen updates.
+-- Users must be created via SQL (using create_password_hash.py tool) - no UI registration.
+

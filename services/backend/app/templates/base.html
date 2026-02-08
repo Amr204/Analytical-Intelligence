@@ -7,42 +7,81 @@
     <meta name="theme-color" content="#000000">
     <meta name="description" content="Analytical-Intelligence v1 - Real-time Security Intelligence Dashboard">
     <title>{% block title %}{{ page_title }} - Analytical-Intelligence{% endblock %}</title>
+    <!-- Early theme script to prevent FOUC (flash of unstyled content) -->
+    <script>
+        (function () {
+            const stored = localStorage.getItem('ai_theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = stored || (prefersDark ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <!-- Readex Pro Font (Professional Arabic-Latin font) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
+    <!-- Chart.js for dashboard analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     {% block extra_head %}{% endblock %}
 </head>
 
 <body class="app-shell">
+    <!-- SVG Icons Sprite (hidden) -->
+    <div style="display:none">
+        {% include 'partials/icons.html' ignore missing %}
+    </div>
+
     <!-- Left Sidebar Navigation -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <span class="logo">🛡️</span>
+            <span class="logo">
+                <svg class="icon icon-lg">
+                    <use xlink:href="/static/icons.svg#icon-suricata" />
+                </svg>
+            </span>
             <span class="brand-text">AI v1</span>
-            <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
+            <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+                <svg class="icon">
+                    <use xlink:href="/static/icons.svg#icon-menu" />
+                </svg>
+            </button>
         </div>
 
         <nav class="sidebar-nav">
             <ul class="nav-menu">
                 <li class="nav-item">
-                    <a href="/" class="nav-link {% if page_title == 'Dashboard' %}active{% endif %}">
-                        <span class="nav-icon">📊</span>
+                    <a href="/" class="nav-link {% if page_title == 'Home' %}active{% endif %}">
+                        <span class="nav-icon"><svg class="icon">
+                                <use xlink:href="/static/icons.svg#icon-home" />
+                            </svg></span>
+                        <span class="nav-text">Home</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/dashboard" class="nav-link {% if page_title == 'Dashboard' %}active{% endif %}">
+                        <span class="nav-icon"><svg class="icon">
+                                <use xlink:href="/static/icons.svg#icon-dashboard" />
+                            </svg></span>
                         <span class="nav-text">Dashboard</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="/alerts" class="nav-link {% if page_title == 'Alerts' %}active{% endif %}">
-                        <span class="nav-icon">🚨</span>
+                        <span class="nav-icon"><svg class="icon">
+                                <use xlink:href="/static/icons.svg#icon-alerts" />
+                            </svg></span>
                         <span class="nav-text">Alerts</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="/devices"
                         class="nav-link {% if page_title == 'Devices' or 'Device:' in page_title %}active{% endif %}">
-                        <span class="nav-icon">💻</span>
+                        <span class="nav-icon"><svg class="icon">
+                                <use xlink:href="/static/icons.svg#icon-devices" />
+                            </svg></span>
                         <span class="nav-text">Devices</span>
                     </a>
                 </li>
@@ -50,37 +89,90 @@
                 <!-- Events Submenu -->
                 <li class="nav-item has-submenu">
                     <a href="#" class="nav-link submenu-toggle {% if 'Events' in page_title %}active{% endif %}">
-                        <span class="nav-icon">📋</span>
+                        <span class="nav-icon"><svg class="icon">
+                                <use xlink:href="/static/icons.svg#icon-activity" />
+                            </svg></span>
                         <span class="nav-text">Events</span>
-                        <span class="submenu-arrow">▾</span>
+                        <span class="submenu-arrow">
+                            <svg class="icon icon-sm">
+                                <use xlink:href="/static/icons.svg#icon-chevron-right" />
+                            </svg>
+                        </span>
                     </a>
                     <ul class="submenu">
                         <li><a href="/events/auth" class="{% if page_title == 'Auth Events' %}active{% endif %}">Auth
                                 Events</a></li>
-                        <li><a href="/events/flows" class="{% if page_title == 'Flow Events' %}active{% endif %}">Flow
+                        <li><a href="/events/suricata"
+                                class="{% if page_title == 'Suricata Events' %}active{% endif %}">Suricata
                                 Events</a></li>
                     </ul>
                 </li>
 
                 <li class="nav-item">
                     <a href="/models" class="nav-link {% if page_title == 'Models' %}active{% endif %}">
-                        <span class="nav-icon">🤖</span>
+                        <span class="nav-icon"><svg class="icon">
+                                <use xlink:href="/static/icons.svg#icon-models" />
+                            </svg></span>
                         <span class="nav-text">Models</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a href="/reports" class="nav-link {% if page_title == 'Reports' %}active{% endif %}">
-                        <span class="nav-icon">📈</span>
+                        <span class="nav-icon"><svg class="icon">
+                                <use xlink:href="/static/icons.svg#icon-reports" />
+                            </svg></span>
                         <span class="nav-text">Reports</span>
                     </a>
                 </li>
             </ul>
         </nav>
 
+        <!-- Theme Toggle Widget -->
+        <div class="sidebar-widget theme-widget">
+            <button class="sidebar-theme-toggle" id="sidebar-theme-toggle" aria-label="Toggle theme"
+                title="Toggle Dark/Light Mode">
+                <span class="theme-icon" id="sidebar-theme-icon">
+                    <svg class="icon icon-sun">
+                        <use xlink:href="/static/icons.svg#icon-sun" />
+                    </svg>
+                    <svg class="icon icon-moon">
+                        <use xlink:href="/static/icons.svg#icon-moon" />
+                    </svg>
+                </span>
+                <span class="widget-label">Toggle Theme</span>
+            </button>
+        </div>
+
+        <!-- Auto Refresh Widget -->
+        <div class="sidebar-widget auto-refresh-widget">
+            <div class="widget-header">
+                <svg class="icon icon-sm">
+                    <use xlink:href="/static/icons.svg#icon-refresh" />
+                </svg>
+                <span class="widget-label">Auto Refresh</span>
+            </div>
+            <div class="widget-body">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="autoRefreshToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+                <select id="autoRefreshInterval" class="refresh-select">
+                    <option value="10000">10s</option>
+                    <option value="30000" selected>30s</option>
+                    <option value="60000">60s</option>
+                </select>
+                <button id="manualRefresh" class="btn-icon" title="Refresh Now">
+                    <svg class="icon">
+                        <use xlink:href="/static/icons.svg#icon-refresh" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
         <div class="sidebar-footer">
             <div class="status-indicator-wrapper">
                 <span class="status-indicator online"></span>
-                <span class="status-text" id="last-update">Online</span>
+                <span class="status-text">System Active</span>
             </div>
         </div>
     </aside>
@@ -89,13 +181,39 @@
     <div class="main-wrapper">
         <!-- Top Bar (minimal) -->
         <header class="topbar">
-            <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open menu">☰</button>
+            <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open menu">
+                <svg class="icon">
+                    <use xlink:href="/static/icons.svg#icon-menu" />
+                </svg>
+            </button>
             <div class="topbar-brand">
                 <span class="brand-full">Analytical-Intelligence v1</span>
             </div>
-            <div class="topbar-status">
+            <div class="topbar-actions">
+                <!-- Welcome message (logged in users only) -->
+                {% if request.session.get('user_id') %}
+                <span class="welcome-text">Welcome, {{ request.session.get('full_name') or request.session.get('username') }}</span>
+                {% endif %}
+                
+                <!-- Social links -->
+                <a href="https://github.com/Amr204/Analytical-Intelligence" class="topbar-link" target="_blank" rel="noopener" title="GitHub">
+                    <svg class="icon"><use xlink:href="/static/icons.svg#icon-github" /></svg>
+                </a>
+                <a href="https://t.me/+ni5ZN6NtgrkzMjg8" class="topbar-link" target="_blank" rel="noopener" title="Telegram">
+                    <svg class="icon"><use xlink:href="/static/icons.svg#icon-telegram" /></svg>
+                </a>
+                <a href="https://discord.gg/BVUP2pcf" class="topbar-link" target="_blank" rel="noopener" title="Discord">
+                    <svg class="icon"><use xlink:href="/static/icons.svg#icon-discord" /></svg>
+                </a>
+                
+                <!-- Logout button (logged in users only) -->
+                {% if request.session.get('user_id') %}
+                <a href="/logout" class="topbar-link" title="Logout">
+                    <svg class="icon"><use xlink:href="/static/icons.svg#icon-logout" /></svg>
+                </a>
+                {% endif %}
+                
                 <span class="status-indicator online"></span>
-                <span id="topbar-last-update">Last update: --</span>
             </div>
         </header>
 
@@ -107,7 +225,7 @@
             <div class="footer-content">
                 <span class="company">&copy; <span id="current-year"></span> Analytical Intelligence</span>
                 <span class="separator">|</span>
-                <span class="version">Version v0.5.1</span>
+                <span class="version">Version Virgen</span>
             </div>
         </footer>
     </div>
@@ -171,6 +289,104 @@
             const yearSpan = document.getElementById('current-year');
             if (yearSpan) {
                 yearSpan.textContent = new Date().getFullYear();
+            }
+
+            // ========== THEME TOGGLE ==========
+            const themeToggle = document.getElementById('theme-toggle');
+            const sidebarThemeToggle = document.getElementById('sidebar-theme-toggle');
+
+            function updateThemeIcon() {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+                document.body.classList.toggle('theme-light', currentTheme === 'light');
+                document.body.classList.toggle('theme-dark', currentTheme === 'dark');
+            }
+
+            function toggleTheme() {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('ai_theme', newTheme);
+                updateThemeIcon();
+            }
+
+            // Topbar theme toggle
+            if (themeToggle) {
+                themeToggle.addEventListener('click', toggleTheme);
+                themeToggle.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleTheme();
+                    }
+                });
+            }
+
+            // Sidebar theme toggle
+            if (sidebarThemeToggle) {
+                sidebarThemeToggle.addEventListener('click', toggleTheme);
+                sidebarThemeToggle.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleTheme();
+                    }
+                });
+            }
+
+            // Initialize icon on page load
+            updateThemeIcon();
+
+            // ========== AUTO REFRESH ==========
+            const autoRefreshToggle = document.getElementById('autoRefreshToggle');
+            const autoRefreshInterval = document.getElementById('autoRefreshInterval');
+            const manualRefresh = document.getElementById('manualRefresh');
+            let refreshTimer = null;
+
+            // Load saved settings
+            const savedRefresh = localStorage.getItem('ai_autoRefresh');
+            const savedInterval = localStorage.getItem('ai_refreshInterval');
+            if (savedRefresh === 'true') autoRefreshToggle.checked = true;
+            if (savedInterval) autoRefreshInterval.value = savedInterval;
+
+            function startAutoRefresh() {
+                stopAutoRefresh();
+                if (autoRefreshToggle.checked) {
+                    const interval = parseInt(autoRefreshInterval.value);
+                    refreshTimer = setInterval(function () {
+                        window.location.reload();
+                    }, interval);
+                }
+            }
+
+            function stopAutoRefresh() {
+                if (refreshTimer) {
+                    clearInterval(refreshTimer);
+                    refreshTimer = null;
+                }
+            }
+
+            if (autoRefreshToggle) {
+                autoRefreshToggle.addEventListener('change', function () {
+                    localStorage.setItem('ai_autoRefresh', this.checked);
+                    if (this.checked) startAutoRefresh();
+                    else stopAutoRefresh();
+                });
+            }
+
+            if (autoRefreshInterval) {
+                autoRefreshInterval.addEventListener('change', function () {
+                    localStorage.setItem('ai_refreshInterval', this.value);
+                    if (autoRefreshToggle.checked) startAutoRefresh();
+                });
+            }
+
+            if (manualRefresh) {
+                manualRefresh.addEventListener('click', function () {
+                    window.location.reload();
+                });
+            }
+
+            // Start auto refresh if enabled
+            if (autoRefreshToggle && autoRefreshToggle.checked) {
+                startAutoRefresh();
             }
         });
     </script>

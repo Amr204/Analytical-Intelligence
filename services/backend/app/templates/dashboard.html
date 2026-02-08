@@ -2,142 +2,410 @@
 
 {% block content %}
 <div class="dashboard">
-    <h1>Security Dashboard</h1>
+    <div class="page-header">
+        <h1>Security Dashboard</h1>
+        <p class="subtitle">Real-time threat monitoring and analytics</p>
+    </div>
 
-    <!-- Stats Cards -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon">📊</div>
-            <div class="stat-content">
-                <span class="stat-value" id="total-events">{{ stats.total_events }}</span>
-                <span class="stat-label">Total Events</span>
+    <!-- ═══════════════════════════════════════════════════════════════
+         KPI SUMMARY CARDS
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="kpi-row">
+        <div class="kpi-card">
+            <div class="kpi-icon"><svg class="icon icon-lg">
+                    <use xlink:href="/static/icons.svg#icon-activity" />
+                </svg></div>
+            <div class="kpi-data">
+                <span class="kpi-value" id="total-events">{{ stats.total_events or 0 }}</span>
+                <span class="kpi-label">Total Events</span>
             </div>
         </div>
-        <div class="stat-card alert-card">
-            <div class="stat-icon">🚨</div>
-            <div class="stat-content">
-                <span class="stat-value" id="total-detections">{{ stats.total_detections }}</span>
-                <span class="stat-label">Total Detections</span>
+
+        <div class="kpi-card accent-red">
+            <div class="kpi-icon"><svg class="icon icon-lg">
+                    <use xlink:href="/static/icons.svg#icon-alerts" />
+                </svg></div>
+            <div class="kpi-data">
+                <span class="kpi-value" id="total-detections">{{ stats.total_detections or 0 }}</span>
+                <span class="kpi-label">Total Detections</span>
             </div>
         </div>
-        <div class="stat-card warning-card">
-            <div class="stat-icon">⏰</div>
-            <div class="stat-content">
-                <span class="stat-value" id="detections-24h">{{ stats.detections_24h }}</span>
-                <span class="stat-label">Detections (24h)</span>
+
+        <div class="kpi-card accent-orange">
+            <div class="kpi-icon"><svg class="icon icon-lg">
+                    <use xlink:href="/static/icons.svg#icon-clock" />
+                </svg></div>
+            <div class="kpi-data">
+                <span class="kpi-value" id="detections-24h">{{ stats.detections_24h or 0 }}</span>
+                <span class="kpi-label">Last 24 Hours</span>
             </div>
         </div>
-        <div class="stat-card info-card">
-            <div class="stat-icon">🖥️</div>
-            <div class="stat-content">
-                <span class="stat-value" id="total-devices">{{ stats.total_devices }}</span>
-                <span class="stat-label">Devices</span>
+
+        <div class="kpi-card accent-blue">
+            <div class="kpi-icon"><svg class="icon icon-lg">
+                    <use xlink:href="/static/icons.svg#icon-devices" />
+                </svg></div>
+            <div class="kpi-data">
+                <span class="kpi-value" id="total-devices">{{ stats.total_devices or 0 }}</span>
+                <span class="kpi-label">Active Devices</span>
+            </div>
+        </div>
+
+        <div class="kpi-card accent-purple">
+            <div class="kpi-icon"><svg class="icon icon-lg">
+                    <use xlink:href="/static/icons.svg#icon-warning" />
+                </svg></div>
+            <div class="kpi-data">
+                <span class="kpi-value" id="summary-high-critical">{{ analytics.summary.high_critical_24h if analytics
+                    and analytics.summary else 0 }}</span>
+                <span class="kpi-label">High/Critical</span>
             </div>
         </div>
     </div>
 
-    <!-- Severity Breakdown -->
-    <div class="section-row">
-        <div class="section-card">
-            <h2>Detections by Severity</h2>
+    <!-- ═══════════════════════════════════════════════════════════════
+         ANALYTICS CHARTS - ROW 1: Full-width Timeline
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="chart-panel full-width">
+        <div class="panel-header">
+            <h2>Detections Over Time</h2>
+            <span class="panel-badge">24H</span>
+        </div>
+        <div class="chart-wrapper chart-lg" id="chart-timeseries-wrapper">
+            <div class="chart-loading" id="loading-timeseries">
+                <div class="spinner"></div>
+                <span>Loading data...</span>
+            </div>
+            <canvas id="chart-timeseries"></canvas>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         ANALYTICS CHARTS - ROW 2: Two-column layout
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="charts-grid">
+        <!-- Severity Breakdown -->
+        <div class="chart-panel">
+            <div class="panel-header">
+                <h2>Severity Distribution</h2>
+            </div>
+            <div class="chart-wrapper" id="chart-severity-wrapper">
+                <div class="chart-loading" id="loading-severity">
+                    <div class="spinner"></div>
+                </div>
+                <canvas id="chart-severity"></canvas>
+            </div>
+        </div>
+
+        <!-- Top Attack Types -->
+        <div class="chart-panel">
+            <div class="panel-header">
+                <h2>Top Attack Types</h2>
+            </div>
+            <div class="chart-wrapper" id="chart-top-labels-wrapper">
+                <div class="chart-loading" id="loading-top-labels">
+                    <div class="spinner"></div>
+                </div>
+                <canvas id="chart-top-labels"></canvas>
+            </div>
+        </div>
+
+        <!-- Top Attacker IPs -->
+        <div class="chart-panel">
+            <div class="panel-header">
+                <h2>Top Source IPs</h2>
+            </div>
+            <div class="chart-wrapper" id="chart-top-attackers-wrapper">
+                <div class="chart-loading" id="loading-top-attackers">
+                    <div class="spinner"></div>
+                </div>
+                <div class="chart-empty hidden" id="empty-top-attackers">
+                    <svg class="icon icon-xl">
+                        <use xlink:href="/static/icons.svg#icon-globe" />
+                    </svg>
+                    <span class="empty-text">No IP data available</span>
+                </div>
+                <canvas id="chart-top-attackers"></canvas>
+            </div>
+        </div>
+
+        <!-- Alerts by Device -->
+        <div class="chart-panel">
+            <div class="panel-header">
+                <h2>Alerts by Device</h2>
+            </div>
+            <div class="chart-wrapper" id="chart-by-device-wrapper">
+                <div class="chart-loading" id="loading-by-device">
+                    <div class="spinner"></div>
+                </div>
+                <canvas id="chart-by-device"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         BREAKDOWN PANELS - Compact Summary
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="breakdown-grid">
+        <div class="breakdown-panel">
+            <h3>Events by Type</h3>
+            <div class="breakdown-list">
+                {% for event_type, count in (stats.events_by_type or {}).items() %}
+                <div class="breakdown-item">
+                    <span class="breakdown-badge {{ event_type }}">{{ event_type }}</span>
+                    <span class="breakdown-value">{{ "{:,}".format(count) }}</span>
+                </div>
+                {% else %}
+                <div class="breakdown-empty">No events recorded</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="breakdown-panel">
+            <h3>Detections by Model</h3>
+            <div class="breakdown-list">
+                {% for model, count in (stats.detections_by_model or {}).items() %}
+                <div class="breakdown-item">
+                    <span class="breakdown-badge model-{{ model }}">{{ model }}</span>
+                    <span class="breakdown-value">{{ "{:,}".format(count) }}</span>
+                </div>
+                {% else %}
+                <div class="breakdown-empty">No detections yet</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="breakdown-panel severity-panel">
+            <h3>Severity Breakdown</h3>
             <div class="severity-bars">
                 {% set severity_colors = {'CRITICAL': 'critical', 'HIGH': 'high', 'MEDIUM': 'medium', 'LOW': 'low'} %}
-                {% set severity_order = ['CRITICAL','HIGH','MEDIUM','LOW'] %}
-                {% set total = stats.total_detections or 1 %}
+                {% set severity_order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] %}
+                {% set total = (stats.total_detections or 0) or 1 %}
 
                 {% for sev in severity_order %}
-                {% set count = stats.detections_by_severity.get(sev, 0) %}
-                {% set pct = ((count / total) * 100) | round(2) %}
-
-                <div class="severity-row">
-                    <span class="severity-badge {{ severity_colors.get(sev, 'low') }}">{{ sev }}</span>
-                    <div class="severity-bar-container">
-                        <div class="severity-bar {{ severity_colors.get(sev, 'low') }}" data-width="{{ pct }}"
-                            aria-label="{{ sev }}: {{ pct }} percent"></div>
+                {% set count = (stats.detections_by_severity or {}).get(sev, 0) %}
+                {% set pct = ((count / total) * 100) | round(1) %}
+                <div class="severity-bar-row">
+                    <span class="sev-label {{ severity_colors.get(sev, 'low') }}">{{ sev }}</span>
+                    <div class="sev-track">
+                        <div class="sev-fill {{ severity_colors.get(sev, 'low') }}" data-width="{{ pct }}"
+                            style="width: calc(var(--w, 0) * 1%)"></div>
                     </div>
-                    <span class="severity-count">{{ count }}</span>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-
-        <div class="section-card">
-            <h2>Events by Type</h2>
-            <div class="type-breakdown">
-                {% for event_type, count in stats.events_by_type.items() %}
-                <div class="type-item">
-                    <span class="type-badge {{ event_type }}">{{ event_type }}</span>
-                    <span class="type-count">{{ count }}</span>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="section-card">
-            <h2>Detections by Model</h2>
-            <div class="model-breakdown">
-                {% for model, count in stats.detections_by_model.items() %}
-                <div class="model-item">
-                    <span class="model-badge {{ model }}">{{ model }}</span>
-                    <span class="model-count">{{ count }}</span>
+                    <span class="sev-count">{{ "{:,}".format(count) }}</span>
                 </div>
                 {% endfor %}
             </div>
         </div>
     </div>
 
-    <!-- Recent Alerts -->
-    <div class="section-card full-width">
-        <div class="section-header">
-            <h2>Recent Alerts</h2>
-            <a href="/alerts" class="btn btn-secondary">View All</a>
-        </div>
-        <div class="alerts-table-container" id="recent-alerts">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Severity</th>
-                        <th>Model</th>
-                        <th>Label</th>
-                        <th>Device</th>
-                        <th>Score</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for d in detections %}
-                    <tr class="severity-row-{{ d.severity|lower }}">
-                        <td class="timestamp">{{ d.ts[:19] }}</td>
-                        <td><span class="severity-badge {{ d.severity|lower }}">{{ d.severity }}</span></td>
-                        <td><span class="model-badge {{ d.model_name }}">{{ d.model_name }}</span></td>
-                        <td class="label-cell" title="{{ d.label }}">{{ d.label[:50] }}{% if d.label|length > 50 %}...{%
-                            endif %}</td>
-                        <td>{{ d.device_id }}</td>
-                        <td>{{ "%.2f"|format(d.score) }}</td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="6" class="empty-state">No recent alerts</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <a href="/alerts" class="btn btn-primary">
+            <svg class="icon">
+                <use xlink:href="/static/icons.svg#icon-alerts" />
+            </svg>
+            View All Alerts
+        </a>
+        <a href="/reports" class="btn btn-outline">
+            <svg class="icon">
+                <use xlink:href="/static/icons.svg#icon-reports" />
+            </svg>
+            Generate Report
+        </a>
     </div>
 </div>
+
+<!-- Server-side analytics data for charts -->
 <script>
-    (() => {
-        'use strict';
+    // Pass server-side analytics data to JavaScript (pre-serialized from Python)
+    window.DASHBOARD_DATA = {{ analytics_json | safe }};
+    window.DASHBOARD_STATS = {{ stats_json | safe }};
 
-        const bars = document.querySelectorAll('.severity-bar[data-width]');
-        for (const el of bars) {
-            const w = Number.parseFloat(el.dataset.width || '0');
-            // Clamp 0..100 to avoid layout weirdness
-            const clamped = Number.isFinite(w) ? Math.max(0, Math.min(100, w)) : 0;
-            el.style.width = `${clamped}%`;
+    // Initialize charts when DOM and Chart.js are ready
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof Chart === 'undefined') {
+            console.error('[AI] Chart.js not loaded');
+            return;
         }
-    })();
-</script>
 
+        const data = window.DASHBOARD_DATA;
+        if (!data) {
+            console.warn('[AI] No dashboard data available');
+            return;
+        }
+
+        console.log('[AI] Initializing charts with server data');
+
+        // Hide all loading spinners
+        document.querySelectorAll('.chart-loading').forEach(el => el.classList.add('hidden'));
+
+        // Theme-aware colors
+        const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+        const colors = {
+            primary: isDark ? '#00ff41' : '#00875a',
+            primaryBg: isDark ? 'rgba(0, 255, 65, 0.15)' : 'rgba(0, 135, 90, 0.15)',
+            secondary: isDark ? '#00d4ff' : '#0066cc',
+            critical: isDark ? '#ff0040' : '#dc2626',
+            high: isDark ? '#ff6600' : '#ea580c',
+            medium: isDark ? '#ffaa00' : '#ca8a04',
+            low: isDark ? '#00ff41' : '#16a34a',
+            purple: isDark ? '#bf00ff' : '#6b47dc',
+            textMuted: isDark ? 'rgba(136, 136, 136, 0.8)' : 'rgba(74, 85, 104, 0.8)',
+            grid: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+            text: isDark ? 'rgba(240, 240, 240, 0.9)' : 'rgba(26, 26, 46, 0.9)'
+        };
+
+        const getSeverityColor = (sev) => ({
+            'CRITICAL': colors.critical,
+            'HIGH': colors.high,
+            'MEDIUM': colors.medium,
+            'LOW': colors.low
+        }[sev] || colors.secondary);
+
+        // V1: Timeseries
+        if (data.timeseries && document.getElementById('chart-timeseries')) {
+            new Chart(document.getElementById('chart-timeseries'), {
+                type: 'line',
+                data: {
+                    labels: data.timeseries.labels || [],
+                    datasets: [{
+                        label: 'Detections',
+                        data: data.timeseries.values || [],
+                        borderColor: colors.primary,
+                        backgroundColor: colors.primaryBg,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: colors.textMuted }, grid: { color: colors.grid } },
+                        y: { ticks: { color: colors.textMuted }, grid: { color: colors.grid }, beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        // V2: Severity
+        if (data.severity && document.getElementById('chart-severity')) {
+            new Chart(document.getElementById('chart-severity'), {
+                type: 'doughnut',
+                data: {
+                    labels: data.severity.labels || [],
+                    datasets: [{
+                        data: data.severity.values || [],
+                        backgroundColor: (data.severity.labels || []).map(getSeverityColor),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '65%',
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: { color: colors.text, padding: 15 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // V3: Top Labels
+        if (data.top_labels && document.getElementById('chart-top-labels')) {
+            new Chart(document.getElementById('chart-top-labels'), {
+                type: 'bar',
+                data: {
+                    labels: (data.top_labels.labels || []).map(l => l && l.length > 25 ? l.substring(0, 25) + '...' : l),
+                    datasets: [{
+                        data: data.top_labels.values || [],
+                        backgroundColor: colors.secondary,
+                        borderRadius: 4,
+                        barThickness: 16
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: colors.textMuted }, grid: { color: colors.grid }, beginAtZero: true },
+                        y: { ticks: { color: colors.textMuted }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // V4: Top Attackers
+        if (data.top_attackers && document.getElementById('chart-top-attackers')) {
+            const hasData = data.top_attackers.labels && data.top_attackers.labels.length > 0;
+            const emptyEl = document.getElementById('empty-top-attackers');
+            const canvas = document.getElementById('chart-top-attackers');
+
+            if (!hasData) {
+                if (emptyEl) emptyEl.classList.remove('hidden');
+                if (canvas) canvas.style.display = 'none';
+            } else {
+                if (emptyEl) emptyEl.classList.add('hidden');
+                new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: data.top_attackers.labels || [],
+                        datasets: [{
+                            data: data.top_attackers.values || [],
+                            backgroundColor: colors.critical,
+                            borderRadius: 4,
+                            barThickness: 16
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y',
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { color: colors.textMuted }, grid: { color: colors.grid }, beginAtZero: true },
+                            y: { ticks: { color: colors.textMuted }, grid: { display: false } }
+                        }
+                    }
+                });
+            }
+        }
+
+        // V5: By Device
+        if (data.by_device && document.getElementById('chart-by-device')) {
+            new Chart(document.getElementById('chart-by-device'), {
+                type: 'bar',
+                data: {
+                    labels: (data.by_device.labels || []).map(l => l && l.length > 12 ? l.substring(0, 12) + '...' : l),
+                    datasets: [{
+                        data: data.by_device.values || [],
+                        backgroundColor: colors.purple,
+                        borderRadius: 4,
+                        barThickness: 24
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: colors.textMuted }, grid: { display: false } },
+                        y: { ticks: { color: colors.textMuted }, grid: { color: colors.grid }, beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        console.log('[AI] Charts initialized successfully');
+    });
+</script>
 {% endblock %}

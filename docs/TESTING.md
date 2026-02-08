@@ -1,171 +1,126 @@
-# Network RF Pipeline Testing Guide
+# 🧪 System Testing & Verification
 
-This document describes how to validate that the Network RF pipeline fixes are working correctly.
+> Guide to validating the Analytical-Intelligence SIEM detection capabilities.
+
+---
+
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Test 1: SSH Brute Force (LSTM)](#test-1-ssh-brute-force-lstm)
+- [Test 2: Network Attacks (Suricata)](#test-2-network-attacks-suricata)
+- [Test 3: System Health](#test-3-system-health)
+
+---
 
 ## Prerequisites
 
-- Backend container is running with the RF model loaded
-- Sensor container is running with `flow_collector` agent
-- Debug mode enabled: `NETWORK_ML_DEBUG=1`
-
-## Test 1: Verify Port Scanning is Detected
-
-### What was fixed
-- `FLOW_MIN_PKTS` default changed from 2 to 1, allowing single-packet scan flows
-- Missing IAT fields added to `flow_to_dict()` for complete feature mapping  
-- Per-label cooldown prevents false DDoS from suppressing Port Scanning
-
-### How to verify
-
-1. **Enable debug logging on backend:**
-   ```bash
-   docker exec -it backend sh -c "export NETWORK_ML_DEBUG=1"
-   # Or set in docker-compose.yml environment
-   ```
-
-2. **Generate port scan traffic from sensor network:**
-   - Use any scanning tool that generates SYN packets to multiple ports
-   - Target a host visible to the sensor's network interface
-
-3. **Check backend logs for Port Scanning predictions:**
-   ```bash
-   docker logs backend 2>&1 | grep -E "\[DEBUG\].*Port Scanning|detection.*Port Scanning"
-   ```
-   
-4. **Expected result:**
-   - Logs should show `[DEBUG] ... top3=[..., Port Scanning:X.XXX, ...]`
-   - If score >= 0.60 and flow passes gating, you should see:
-     `Network RF detection: Port Scanning (HIGH|CRITICAL)`
-   - UI should display Port Scanning alerts
-
-### Troubleshooting if Port Scanning still not detected
-
-1. **Check if flows are reaching backend:**
-   ```bash
-   docker logs flow_collector 2>&1 | grep "Sent.*flows"
-   ```
-
-2. **Check FLOW_MIN_PKTS setting:**
-   ```bash
-   docker exec flow_collector env | grep FLOW_MIN_PKTS
-   # Should be 1 or unset (defaults to 1)
-   ```
-
-3. **Check cooldown suppression:**
-   ```bash
-   docker logs backend 2>&1 | grep "SUPPRESSED.*Port Scanning"
-   ```
-   If you see suppression, wait for cooldown to expire (default 3600s) or reduce `ML_COOLDOWN_SECONDS_PER_SRC`.
+1.  **Kali Linux** or another attacker machine on the same network.
+2.  **Analytical-Intelligence** running:
+    - Analysis Server (Backend + DB)
+    - Sensor Server (Auth + Suricata)
 
 ---
 
-## Test 2: Verify False DDoS Stops on Idle Traffic
+## Test 1: SSH Brute Force (LSTM)
 
-### What was fixed
-- Rate features (Flow Bytes/s, Packets/s) now return 0 when `duration_ms < 50`
-- Volume attack gating requires minimum: duration >= 100ms, packets >= 10, bytes >= 1000
-- sklearn `model.classes_` ordering now correctly maps probability indices to labels
+**Objective:** Verify that the LSTM model detects a sequence of failed login attempts.
 
-### How to verify
-
-1. **Leave sensor running on idle network (little to no traffic)**
-
-2. **Monitor for DDoS detections over 10-15 minutes:**
-   ```bash
-   docker logs backend 2>&1 | grep -c "detection.*DDoS"
-   # Should be 0 or very few, not continuous
-   ```
-
-3. **Enable debug mode to see why DDoS is filtered:**
-   ```bash
-   docker logs backend 2>&1 | grep -E "GATING_DURATION|GATING_PACKETS|GATING_BYTES"
-   ```
-   
-4. **Expected result:**
-   - No periodic DDoS alerts on genuinely idle traffic
-   - Debug logs show flows being filtered by gating layer:
-     `-> GATING_DURATION (DDoS, 10ms < 100ms)`
-     `-> GATING_PACKETS (DDoS, 3 < 10)`
-
-### Adjusting thresholds
-
-If you still see false positives, increase gating thresholds via environment variables:
-
-```yaml
-environment:
-  MIN_VOLUME_ATTACK_DURATION_MS: "200"   # Require 200ms minimum
-  MIN_VOLUME_ATTACK_PACKETS: "20"        # Require 20 packets minimum
-  MIN_VOLUME_ATTACK_BYTES: "5000"        # Require 5KB minimum
-```
-
----
-
-## Test 3: Verify Debug Mode Output
-
-### Enable debug sampling
-```yaml
-environment:
-  NETWORK_ML_DEBUG: "1"
-  NETWORK_ML_DEBUG_SAMPLE_RATE: "10"  # Log 1 out of every 10 flows
-```
-
-### Expected log format
-```
-[DEBUG] src=192.168.1.100 dst=10.0.0.1:443 proto=6 dur=1500ms pkts=25 bytes=5000 
-        mapped=38 fallback=14 top3=[Normal Traffic:0.85, DDoS:0.08, DoS:0.04] -> BENIGN
-```
-
-### Fields explained
-- `mapped=38` - 38 features filled from real NFStream fields
-- `fallback=14` - 14 features using fallback (0 or median)
-- `top3=[...]` - Top 3 predicted labels with probabilities
-- `-> REASON` - Why detection was created or rejected:
-  - `BENIGN` - Predicted as Normal Traffic
-  - `DETECTION` - Attack detected, stored in database
-  - `THRESHOLD` - Score below 0.60 threshold
-  - `ALLOWLIST_FILTERED` - Label not in allowlist (Bots, Web Attacks)
-  - `GATING_*` - Failed volume attack sanity checks
-
----
-
-## Environment Variables Reference
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FLOW_MIN_PKTS` | `1` | Minimum packets per flow to forward (agent) |
-| `MIN_FLOW_DURATION_MS` | `50` | Below this, rate features are 0 (mapper) |
-| `MIN_VOLUME_ATTACK_DURATION_MS` | `100` | Volume attack minimum duration (gating) |
-| `MIN_VOLUME_ATTACK_PACKETS` | `10` | Volume attack minimum packets (gating) |
-| `MIN_VOLUME_ATTACK_BYTES` | `1000` | Volume attack minimum bytes (gating) |
-| `NETWORK_ML_DEBUG` | `0` | Enable debug logging (1=on) |
-| `NETWORK_ML_DEBUG_SAMPLE_RATE` | `50` | Log 1 out of every N flows |
-| `ML_COOLDOWN_SECONDS_PER_SRC` | `3600` | Per (IP, label) cooldown window |
-
----
-
-## Running Unit Tests
-
+### 1. Prepare Attack
+On the attacker machine, create a password list:
 ```bash
-cd services/backend
-pytest tests/test_network_ml_model.py -v
+echo -e "admin\n123456\npassword\nroot\ntest\nuser\nletmein\nqwerty" > passwords.txt
 ```
 
-### Test coverage includes:
-- `TestClassesMapping` - Verifies sklearn classes_ ordering fix
-- `TestFeatureMapperDurationHandling` - Verifies duration_ms==0 produces rate=0
-- `TestIATUnitConversion` - Verifies ms→µs conversion
-- `TestAllowlistFiltering` - Verifies 4-label allowlist
+### 2. Launch Attack
+Use `hydra` to simulate a rapid brute force attack against the **Sensor Server**:
+```bash
+hydra -l root -P passwords.txt ssh://<SENSOR_IP> -t 4 -V
+```
+
+### 3. Verify Detection
+1.  **Check Dashboard:** `http://<ANALYZER_IP>:8000/alerts`
+2.  **Look for:**
+    - **Model:** `ssh_lstm`
+    - **Label:** `Brute Force`
+    - **Severity:** `CRITICAL` or `HIGH`
+
+### 4. Troubleshooting
+If no alert appears:
+- Check `auth_collector` logs: `docker logs ai_db-auth-collector`
+- Ensure `INGEST_API_KEY` matches.
+- Check if `SSH_BRUTEFORCE_THRESHOLD` in `.env` is too high (default 5).
 
 ---
 
-## Summary of Fixes Applied
+## Test 2: Network Attacks (Suricata)
 
-| Issue | Root Cause | Fix |
-|-------|-----------|-----|
-| Port Scanning not detected | `bidirectional_packets < 2` filter dropped scans | Changed to `FLOW_MIN_PKTS=1` |
-| Port Scanning not detected | Missing IAT fields caused bad features | Added 6 missing piat fields |
-| Port Scanning not detected | Per-IP cooldown suppressed all labels | Changed to per-(IP, label) cooldown |
-| False DDoS on idle traffic | `duration_ms=0` inflated rate features | Rate features = 0 when duration < 50ms |
-| False DDoS on idle traffic | argmax used directly as label_id | Now uses `model.classes_[argmax]` |
-| False DDoS on idle traffic | Gating only checked PPS/BPS | Added absolute min duration/packets/bytes |
-| IAT features wrong scale | ms not converted to µs | All IAT features now × 1000 |
+**Objective:** Verify that Suricata IDS detects network signatures.
+
+### Scenario A: Port Scanning (Nmap)
+
+**Command (Attacker):**
+```bash
+nmap -sS -F <SENSOR_IP>
+```
+
+**Expected Result:**
+- **Alert:** `ET SCAN Potential SSH Scan` or similar.
+- **Severity:** `MEDIUM` or `HIGH`.
+
+### Scenario B: DoS / DDoS Simulation (hping3)
+
+**Command (Attacker):**
+```bash
+# Send SYN flood to port 80
+sudo hping3 -S --flood -V -p 80 <SENSOR_IP>
+```
+*Stop after 10-15 seconds.*
+
+**Expected Result:**
+- **Alert:** `ET DOS Possible SYN Flood` or similar.
+- **Model:** `suricata`.
+
+### Scenario C: Connectivity Check (Test Rule)
+
+If real attacks don't trigger, test with a custom rule.
+
+1.  **Add Rule on Sensor:**
+    Edit `services/suricata/etc/local.rules`:
+    ```
+    alert icmp any any -> any any (msg:"ICMP Ping Detected"; sid:1000001; rev:1;)
+    ```
+
+2.  **Restart Suricata:**
+    ```bash
+    docker compose -f docker-compose.sensor.yml restart suricata
+    ```
+
+3.  **Ping Sensor:**
+    ```bash
+    ping -c 4 <SENSOR_IP>
+    ```
+
+4.  **Verify Alert:** Dashboard should show "ICMP Ping Detected".
+
+---
+
+## Test 3: System Health
+
+### 1. API Health Check
+```bash
+curl -s http://<ANALYZER_IP>:8000/api/v1/health | jq
+```
+**Expected:** `"status": "ok"`
+
+### 2. Device Status
+Check `http://<ANALYZER_IP>:8000/devices`.
+- Sensor status should be **ONLINE**.
+- Last Seen should be "Just now" or extremely recent.
+
+### 3. Log Verification
+Check backend logs for successful ingestion:
+```bash
+docker logs --tail 20 ai_db-backend
+```
+Look for: `POST /api/v1/ingest/suricata 201 Created` or `POST /api/v1/ingest/auth 201 Created`.

@@ -3,18 +3,27 @@
 {% block content %}
 <div class="page-content">
     <div class="page-header">
-        <h1>🧠 ML Models</h1>
-        <p class="subtitle">Status and configuration of detection models</p>
+        <h1><svg class="icon icon-lg">
+                <use xlink:href="/static/icons.svg#icon-models" />
+            </svg> Detection Models</h1>
+        <p class="subtitle">Status and configuration of detection engines</p>
     </div>
 
     <div class="models-grid">
         <!-- SSH LSTM Model -->
         <div class="model-card {% if models.ssh_lstm.loaded %}loaded{% else %}not-loaded{% endif %}">
             <div class="model-header">
-                <div class="model-icon">🔐</div>
+                <div class="model-icon">
+                    <svg class="icon icon-xl">
+                        <use xlink:href="/static/icons.svg#icon-lock" />
+                    </svg>
+                </div>
                 <div class="model-title">
                     <h2>SSH LSTM</h2>
-                    <span class="model-status {% if models.ssh_lstm.loaded %}online{% else %}offline{% endif %}">
+                    <span
+                        class="model-status {% if models.ssh_lstm.loaded %}status-online{% else %}status-offline{% endif %}">
+                        <span
+                            class="status-indicator {% if models.ssh_lstm.loaded %}online{% else %}offline{% endif %}"></span>
                         {{ 'LOADED' if models.ssh_lstm.loaded else 'NOT LOADED' }}
                     </span>
                 </div>
@@ -49,47 +58,171 @@
             </div>
         </div>
 
-        <!-- Network RF Model -->
-        <div class="model-card {% if models.network_ml.loaded %}loaded{% else %}not-loaded{% endif %}">
+        <!-- Suricata IDS -->
+        <div class="model-card loaded">
             <div class="model-header">
-                <div class="model-icon">🌐</div>
+                <div class="model-icon">
+                    <svg class="icon icon-xl">
+                        <use xlink:href="/static/icons.svg#icon-suricata" />
+                    </svg>
+                </div>
                 <div class="model-title">
-                    <h2>Network RF</h2>
-                    <span class="model-status {% if models.network_ml.loaded %}online{% else %}offline{% endif %}">
-                        {{ 'LOADED' if models.network_ml.loaded else 'NOT LOADED' }}
+                    <h2>Suricata IDS</h2>
+                    <span class="model-status status-online">
+                        <span class="status-indicator online"></span>
+                        ACTIVE
                     </span>
                 </div>
             </div>
             <div class="model-body">
                 <p class="model-description">
-                    Random Forest classifier trained on CIC-IDS2017 dataset.
-                    Classifies network flows into attack categories using {{ models.network_ml.features_count }} flow
-                    features.
+                    High-performance network IDS/IPS using signature-based detection.
+                    Monitors network traffic with custom rules for known attack patterns.
                 </p>
                 <div class="model-stats">
                     <div class="model-stat">
-                        <span class="stat-label">Features</span>
-                        <span class="stat-value">{{ models.network_ml.features_count }}</span>
+                        <span class="stat-label">Engine</span>
+                        <span class="stat-value">Suricata</span>
                     </div>
                     <div class="model-stat">
-                        <span class="stat-label">Classes</span>
-                        <span class="stat-value">{{ models.network_ml.labels_count }}</span>
+                        <span class="stat-label">Detection</span>
+                        <span class="stat-value">Signature</span>
+                    </div>
+                    <div class="model-stat">
+                        <span class="stat-label">Profile</span>
+                        <span class="stat-value">Default</span>
+                    </div>
+                    <div class="model-stat">
+                        <span class="stat-label">Updates</span>
+                        <span class="stat-value">Daily</span>
                     </div>
                 </div>
-                {% if models.network_ml.labels %}
-                <div class="model-labels">
-                    <h4>Attack Classes</h4>
-                    <div class="label-tags">
-                        {% for label in models.network_ml.labels %}
-                        <span class="label-tag {% if label == 'Normal Traffic' %}benign{% else %}attack{% endif %}">{{
-                            label
-                            }}</span>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .models-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: var(--spacing-lg);
+    }
+
+    .model-card {
+        background: var(--bg-card);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--glass-border);
+        padding: var(--spacing-lg);
+        transition: all 0.3s ease;
+    }
+
+    .model-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-card);
+    }
+
+    .model-card.loaded {
+        border-color: var(--neon-green);
+    }
+
+    .model-card.deprecated {
+        opacity: 0.7;
+    }
+
+    .model-header {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--spacing-md);
+        margin-bottom: var(--spacing-md);
+        padding-bottom: var(--spacing-md);
+        border-bottom: 1px solid var(--glass-border);
+    }
+
+    .model-icon {
+        color: var(--cyber-blue);
+    }
+
+    .model-card.loaded .model-icon {
+        color: var(--neon-green);
+    }
+
+    .model-title {
+        flex: 1;
+    }
+
+    .model-title h2 {
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0 0 var(--spacing-xs);
+    }
+
+    .model-status {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--spacing-xs);
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        border-radius: var(--radius-sm);
+    }
+
+    .status-online {
+        background: var(--severity-low-bg);
+        color: var(--severity-low);
+    }
+
+    .status-offline {
+        background: var(--severity-high-bg);
+        color: var(--severity-high);
+    }
+
+    .status-removed {
+        background: var(--severity-critical-bg);
+        color: var(--severity-critical);
+    }
+
+    .model-description {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        line-height: 1.6;
+        margin-bottom: var(--spacing-md);
+    }
+
+    .model-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: var(--spacing-sm);
+    }
+
+    .model-stat {
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-elevated);
+        padding: var(--spacing-sm);
+        border-radius: var(--radius-sm);
+        text-align: center;
+    }
+
+    .model-stat .stat-label {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .model-stat .stat-value {
+        font-family: var(--font-mono);
+        font-size: 0.9rem;
+        color: var(--text-primary);
+        font-weight: 500;
+    }
+
+    @media (max-width: 768px) {
+        .models-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 {% endblock %}

@@ -44,21 +44,46 @@ services:
       - ./agents/common:/app/common:ro
 
   # ─────────────────────────────────────────────────────────────────────────
-  # Flow Collector - Captures network flows with NFStream
+  # Suricata IDS - Rule-based intrusion detection
   # ─────────────────────────────────────────────────────────────────────────
-  flow_collector:
+  suricata:
     build:
-      context: ./agents/flow_collector
+      context: ./services/suricata
       dockerfile: Dockerfile
-      network: host
-    container_name: ai_db-flow-collector
+    container_name: ai_db-suricata
     restart: unless-stopped
     network_mode: host
     cap_add:
       - NET_ADMIN
       - NET_RAW
-    security_opt:
-      - apparmor=unconfined
+      - SYS_NICE
+    environment:
+      SURICATA_IFACE: ${NET_IFACE:-ens33}
+      MAX_EVE_MB: ${SURICATA_MAX_EVE_MB:-200}
+    volumes:
+      - ./services/suricata/etc/suricata.yaml:/etc/suricata/suricata.yaml:ro
+      - ./services/suricata/log:/var/log/suricata
+      - ./services/suricata/rules:/var/lib/suricata/rules
+    healthcheck:
+      test: [ "CMD-SHELL", "pgrep -x suricata && test -f /var/log/suricata/stats.log && find /var/log/suricata/stats.log -mmin -2 | grep -q stats.log" ]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Suricata Collector - Sends alerts to analysis server
+  # ─────────────────────────────────────────────────────────────────────────
+  suricata_collector:
+    build:
+      context: ./agents/suricata_collector
+      dockerfile: Dockerfile
+      network: host
+    container_name: ai_db-suricata-collector
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - suricata
     environment:
       # Required - will error if not set
       ANALYZER_HOST: ${ANALYZER_HOST:?error - set ANALYZER_HOST in .env}
@@ -66,12 +91,12 @@ services:
       DEVICE_ID: ${DEVICE_ID:?error - set DEVICE_ID in .env}
       HOSTNAME: ${HOSTNAME:?error - set HOSTNAME in .env}
       # Optional with defaults
-      NET_IFACE: ${NET_IFACE:-ens33}
       ANALYZER_PORT: ${ANALYZER_PORT:-8000}
-      # Optional override (leave empty for auto-detect)
       DEVICE_IP: ${DEVICE_IP:-}
-      # Flow timeouts for ~6s detection cadence
-      FLOW_IDLE_TIMEOUT: ${FLOW_IDLE_TIMEOUT:-6}
-      FLOW_ACTIVE_TIMEOUT: ${FLOW_ACTIVE_TIMEOUT:-6}
+      NET_IFACE: ${NET_IFACE:-ens33}
+      # Suricata-specific
+      SURICATA_EVE_PATH: /var/log/suricata/eve.json
     volumes:
+      - ./services/suricata/log:/var/log/suricata:ro
       - ./agents/common:/app/common:ro
+      - ./agents/suricata_collector/spool:/app/spool

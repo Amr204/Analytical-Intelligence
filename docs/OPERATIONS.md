@@ -206,6 +206,57 @@ SELECT
 
 ---
 
+"
+
+---
+
+## Suricata Operations
+
+### Check IDS Status
+```bash
+# Check container and health
+docker ps | grep suricata
+
+# View live rules log
+docker logs -f ai_db-suricata
+```
+
+### Update Rules Manually
+Suricata is configured to use ET Open rules. To force an update:
+```bash
+# Restart container with update flag enabled temporarily
+# Or simply restart if RULES_UPDATE=1 in .env
+docker compose -f docker-compose.sensor.yml restart suricata
+```
+
+### Tuning Rules (Noise Reduction)
+If alerts are too noisy, adjust the `SURICATA_PROFILE` in `.env` on the sensor server:
+- `balanced` (Default): Good baseline.
+- `low-noise`: Fewer alerts, focuses on high-confidence threats.
+- `aggressive`: Maximum visibility, higher false positives.
+
+After changing `.env`, apply changes:
+```bash
+docker compose -f docker-compose.sensor.yml up -d suricata
+```
+
+### Custom Rules
+1. Add rules to `services/suricata/etc/local.rules` on the sensor.
+   Example: `alert ip any any -> any any (msg:"Test Rule"; sid:1000001; rev:1;)`
+2. Restart Suricata:
+   ```bash
+   docker compose -f docker-compose.sensor.yml restart suricata
+   ```
+
+### Suricata Statistics
+```bash
+docker exec -it ai_db-postgres psql -U ai -d ai_db -c "
+SELECT severity, count(*) FROM detections WHERE model_name='suricata' GROUP BY severity;
+"
+```
+
+---
+
 ## Adding New Sensors
 
 ### Step 1: Set Up New Sensor Server
@@ -310,7 +361,7 @@ VACUUM ANALYZE;
 | Devices | `http://<ANALYZER_IP>:8000/devices` | Sensor inventory |
 | Models | `http://<ANALYZER_IP>:8000/models` | ML model status |
 | Auth Events | `http://<ANALYZER_IP>:8000/events/auth` | Raw SSH events |
-| Flow Events | `http://<ANALYZER_IP>:8000/events/flows` | Raw network flows |
+
 
 ---
 

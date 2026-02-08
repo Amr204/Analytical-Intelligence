@@ -31,7 +31,41 @@
 |----------|----------------|
 | `/api/v1/ingest/*` | `INGEST_API_KEY` header |
 | `/api/v1/health` | None (public) |
-| UI pages (`/`, `/alerts`, etc.) | None (protect with firewall) |
+| UI pages (`/`, `/dashboard`, etc.) | Session-based login (required) |
+| `/login`, `/logout` | None (public) |
+| `/static/*` | None (public assets) |
+
+### UI User Management
+
+Users are managed via SQL (no UI for user registration). To create a user:
+
+1. **Generate password hash:**
+   ```bash
+   cd /path/to/project
+   python scripts/create_password_hash.py
+   ```
+
+2. **Insert user via SQL:**
+   ```sql
+   INSERT INTO users (username, full_name, password_hash, is_active)
+   VALUES ('admin', 'Administrator', '<hash_from_step_1>', TRUE);
+   ```
+
+3. **Login lockout policy:**
+   - 5 failed attempts → 5 min lockout
+   - 5 more failed attempts → 1 hour lockout
+
+### Device Approval
+
+New devices start with `pending` status. Events from pending/blocked devices are rejected.
+
+| Status | Description |
+|--------|-------------|
+| `pending` | New device, awaiting admin approval |
+| `allowed` | Active device, events are collected |
+| `blocked` | Blocked device, events are rejected |
+
+Admins can allow/block devices via the Devices page in the UI.
 
 ---
 

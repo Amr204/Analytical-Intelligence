@@ -8,7 +8,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_session, ensure_device, insert_raw_event, insert_detection
+from app.db import get_session, ensure_device, insert_raw_event, insert_detection, get_device_approval_status
 from app.security import verify_api_key
 from app.schemas import AuthEventPayload, IngestResponse
 from app.detectors.ssh_lstm_detector import analyze_auth_event
@@ -27,6 +27,7 @@ async def ingest_auth_event(
     """
     Ingest an auth.log event.
     Stores the raw event and runs SSH LSTM detection.
+    Device must be 'allowed' to store events.
     """
     try:
         # Parse timestamp
@@ -38,10 +39,24 @@ async def ingest_auth_event(
         else:
             ts = datetime.utcnow()
         
-        # Ensure device exists
+        # Ensure device exists (creates with 'pending' status if new)
         await ensure_device(session, payload.device_id, payload.hostname, payload.device_ip)
+        await session.commit()
         
-        # Store raw event
+        # Check device approval status
+        approval_status = await get_device_approval_status(session, payload.device_id)
+        if approval_status != 'allowed':
+            # Reject but return 200 to prevent sensor retries
+            message = "Device pending approval" if approval_status == 'pending' else "Device blocked"
+            logger.info(f"Auth event rejected: device={payload.device_id}, status={approval_status}")
+            return IngestResponse(
+                status="rejected",
+                event_id=None,
+                detection_id=None,
+                message=message
+            )
+        
+        # Store raw event (only for allowed devices)
         event_payload = {
             "line": payload.line,
             "hostname": payload.hostname,

@@ -57,6 +57,32 @@ class FlowEventPayload(BaseModel):
 
 
 # =====================================================
+# Suricata Alert Schemas
+# =====================================================
+
+class SuricataAlertData(BaseModel):
+    """Suricata alert signature data."""
+    signature: str
+    category: str = "Unknown"
+    severity: int = 3
+    action: str = "allowed"
+    gid: int = 1
+    sid: int = 0
+    rev: int = 1
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class SuricataAlertPayload(BaseModel):
+    """Payload for Suricata alert ingestion."""
+    device_id: str
+    hostname: str
+    device_ip: str
+    timestamp: Optional[str] = None
+    alert: Dict[str, Any]  # Alert signature data
+    raw: Optional[Dict[str, Any]] = None  # Raw event fields (src_ip, dst_ip, etc.)
+
+
+# =====================================================
 # API Response Schemas
 # =====================================================
 

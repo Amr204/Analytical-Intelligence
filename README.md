@@ -1,4 +1,4 @@
-# 🛡️ Analytical-Intelligence v1 - Security Event Management System
+#  Analytical-Intelligence v1 - Security Event Management System
 
 > A lightweight SIEM for real-time attack detection using Machine Learning
 

@@ -67,11 +67,22 @@ class Settings(BaseSettings):
     telegram_min_severity: str = "HIGH"  # Only send alerts >= this severity
     telegram_rate_limit_per_min: int = 20
     telegram_dedup_window_seconds: int = 60
+    telegram_suricata_dedup_window_seconds: int = 300  # 5 min for suricata DDoS bursts
     telegram_timeout_seconds: int = 10
     telegram_parse_mode: str = "HTML"
     telegram_disable_web_preview: bool = True
     telegram_startup_test: bool = False  # Send test message on startup
     public_dashboard_base_url: str = ""  # Optional: for dashboard links in alerts
+    
+    # Suricata Alert Handling
+    suricata_rollup_window_minutes: int = 5  # Time bucket for incident grouping (env: SURICATA_ROLLUP_WINDOW_MINUTES)
+    suricata_local_sid_min: int = 1000000  # Minimum SID for local AI rules
+    suricata_local_sid_max: int = 1009999  # Maximum SID for local AI rules
+    
+    # Timezone for UI display (DB always stores UTC)
+    # Valid timezone names: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+    # Valid timezone names: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+    app_timezone: str = "Asia/Kuwait"  # Local timezone for UI display (env: APP_TIMEZONE)
     
     # Social Links (for Home page, optional)
     app_telegram_url: str = "https://t.me/+ni5ZN6NtgrkzMjg8"  # Telegram channel/group URL

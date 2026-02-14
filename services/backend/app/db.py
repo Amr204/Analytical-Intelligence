@@ -3,7 +3,7 @@ Analytical-Intelligence v1 - Database Layer
 """
 
 from datetime import datetime, timedelta
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Tuple
 import logging
 import json
 
@@ -18,6 +18,57 @@ logger = logging.getLogger(__name__)
 
 # Device online threshold (minutes) - devices seen within this window are "online"
 DEVICE_ONLINE_THRESHOLD_MINUTES = 10
+
+# Timezone handling for UI display
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo  # Python < 3.9
+
+def get_local_timezone():
+    """Get the configured local timezone for UI display."""
+    try:
+        return ZoneInfo(settings.app_timezone)
+    except Exception as e:
+        logger.warning(f"Invalid timezone '{settings.app_timezone}': {e}, using UTC")
+        return None
+
+def utc_to_local(dt: datetime) -> datetime:
+    """
+    Convert a UTC datetime to the configured local timezone.
+    Used for UI display - DB always stores UTC.
+    """
+    if dt is None:
+        return None
+    # Ensure timezone-aware (assume UTC if naive)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=None)
+    return dt.astimezone(get_local_timezone())
+
+def format_local_iso(dt: datetime) -> str:
+    """Format a datetime as ISO string in local timezone."""
+    if dt is None:
+        return None
+    local_dt = utc_to_local(dt)
+    return local_dt.isoformat()
+
+def parse_datetime_param(dt_str: str) -> datetime:
+    """
+    Parse datetime string from API params, ensuring timezone awareness.
+    Accepts ISO format with or without timezone. Assumes UTC if no timezone.
+    """
+    if not dt_str:
+        return None
+    try:
+        # Try parsing with timezone
+        dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            # Assume UTC if naive
+            pass
+        return dt
+    except Exception as e:
+        logger.warning(f"Failed to parse datetime '{dt_str}': {e}")
+        return None
 
 
 # Async engine
@@ -180,9 +231,10 @@ async def ensure_schema() -> None:
             "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)"
         ))
         
-        # Backward compatibility: set existing devices (with NULL approval_status) to 'allowed'
+        # Backward compatibility: set existing devices (NULL or pending) to 'allowed'
+        # This ensures existing sensors don't suddenly get blocked after update
         await conn.execute(text(
-            "UPDATE devices SET approval_status = 'allowed' WHERE approval_status IS NULL OR approval_status = ''"
+            "UPDATE devices SET approval_status = 'allowed' WHERE approval_status IS NULL OR approval_status = '' OR approval_status = 'pending'"
         ))
         
         logger.info("Database schema migration completed")
@@ -633,36 +685,71 @@ async def get_detections_filtered(
     label: str = None,
     device_id: str = None,
     last_minutes: int = None,
-    limit: int = 100
-) -> List[dict]:
-    """Get filtered detections."""
-    query = "SELECT id, ts, device_id, model_name, label, score, severity, details FROM detections WHERE 1=1"
-    params = {"limit": limit}
+    limit: int = 100,
+    offset: int = 0,
+    return_total: bool = False
+):
+    """
+    Get filtered detections with optional pagination.
+    
+    Args:
+        severity: Filter by severity level
+        model_name: Filter by model name
+        label: Filter by label (partial match)
+        device_id: Filter by device ID
+        last_minutes: Filter by time window
+        limit: Maximum results to return
+        offset: Number of results to skip (for pagination)
+        return_total: If True, returns (results, total_count) tuple
+    
+    Returns:
+        List[dict] or Tuple[List[dict], int] if return_total=True
+    """
+    # Build WHERE clause
+    where_clauses = ["1=1"]
+    params = {"limit": limit, "offset": offset}
     
     if severity:
-        query += " AND severity = :severity"
+        where_clauses.append("severity = :severity")
         params["severity"] = severity
     
     if model_name:
-        query += " AND model_name = :model_name"
+        where_clauses.append("model_name = :model_name")
         params["model_name"] = model_name
     
     if label:
-        query += " AND label ILIKE :label"
+        where_clauses.append("label ILIKE :label")
         params["label"] = f"%{label}%"
     
     if device_id:
-        query += " AND device_id = :device_id"
+        where_clauses.append("device_id = :device_id")
         params["device_id"] = device_id
     
     if last_minutes:
-        query += f" AND ts > NOW() - INTERVAL '{int(last_minutes)} minutes'"
+        where_clauses.append(f"ts > NOW() - INTERVAL '{int(last_minutes)} minutes'")
     
-    query += " ORDER BY ts DESC LIMIT :limit"
+    where_sql = " AND ".join(where_clauses)
+    
+    # Get total count if requested
+    total_count = 0
+    if return_total:
+        count_query = f"SELECT COUNT(*) FROM detections WHERE {where_sql}"
+        count_result = await session.execute(text(count_query), params)
+        total_count = count_result.scalar() or 0
+    
+    # Get results with pagination
+    query = f"""
+        SELECT id, ts, device_id, model_name, label, score, severity, details 
+        FROM detections 
+        WHERE {where_sql}
+        ORDER BY ts DESC 
+        LIMIT :limit OFFSET :offset
+    """
     
     result = await session.execute(text(query), params)
     rows = result.fetchall()
-    return [
+    
+    results = [
         {
             "id": row[0],
             "ts": row[1].isoformat() if row[1] else None,
@@ -675,6 +762,424 @@ async def get_detections_filtered(
         }
         for row in rows
     ]
+    
+    if return_total:
+        return results, total_count
+    return results
+
+
+async def get_incidents_filtered(
+    session: AsyncSession,
+    severity: str = None,
+    model_name: str = None,
+    label: str = None,
+    device_id: str = None,
+    window_minutes: int = 5,
+    last_minutes: int = None,
+    limit: int = 50,
+    offset: int = 0,
+    return_total: bool = False
+):
+    """
+    Get incidents (grouped detections) with window-based aggregation.
+    
+    Groups detections by (label, severity, model_name, device_id, dst_ip, dst_port)
+    within time windows of window_minutes.
+    
+    Args:
+        severity: Filter by severity level
+        model_name: Filter by model name
+        label: Filter by label (partial match)
+        device_id: Filter by device ID
+        window_minutes: Size of time window for grouping (default 5 min)
+        last_minutes: Filter detections from last N minutes
+        limit: Maximum incidents to return
+        offset: Pagination offset
+        return_total: If True, returns (results, total_count) tuple
+    
+    Returns:
+        List of incident dicts with window info and counts
+    """
+    # Build WHERE clause for the base detections
+    where_clauses = ["1=1"]
+    params = {"limit": limit, "offset": offset, "window_minutes": window_minutes}
+    
+    if severity:
+        where_clauses.append("severity = :severity")
+        params["severity"] = severity
+    
+    if model_name:
+        where_clauses.append("model_name = :model_name")
+        params["model_name"] = model_name
+    
+    if label:
+        where_clauses.append("label ILIKE :label")
+        params["label"] = f"%{label}%"
+    
+    if device_id:
+        where_clauses.append("device_id = :device_id")
+        params["device_id"] = device_id
+    
+    if last_minutes:
+        where_clauses.append(f"ts > NOW() - INTERVAL '{int(last_minutes)} minutes'")
+    
+    where_sql = " AND ".join(where_clauses)
+    
+    # Window-based aggregation using date_trunc
+    # Group by truncated time window + label + device (ignore flow details for grouping)
+    incident_query = f"""
+        WITH windowed AS (
+            SELECT 
+                date_trunc('minute', ts) - 
+                    (EXTRACT(MINUTE FROM ts)::int % :window_minutes) * INTERVAL '1 minute' AS window_start,
+                label,
+                severity,
+                model_name,
+                device_id,
+                COALESCE(dst_ip, '') AS dst_ip,
+                COALESCE(dst_port::text, '') AS dst_port,
+                COALESCE(occurrences, 1) AS occurrences,
+                ts,
+                id
+            FROM detections
+            WHERE {where_sql}
+        )
+        SELECT 
+            window_start,
+            window_start + INTERVAL '{int(window_minutes)} minutes' AS window_end,
+            label,
+            severity,
+            model_name,
+            device_id,
+            -- Aggregate flow details
+            CASE 
+                WHEN COUNT(DISTINCT dst_ip) > 1 THEN 'Multiple (' || COUNT(DISTINCT dst_ip) || ')'
+                ELSE MIN(dst_ip)
+            END AS dst_ip,
+            CASE 
+                WHEN COUNT(DISTINCT dst_port) > 1 THEN 'Multiple (' || COUNT(DISTINCT dst_port) || ')'
+                ELSE MIN(dst_port)
+            END AS dst_port,
+            SUM(occurrences) AS detection_count,
+            MIN(ts) AS first_seen,
+            MAX(ts) AS last_seen,
+            MIN(id) AS first_id
+        FROM windowed
+        GROUP BY window_start, label, severity, model_name, device_id
+        ORDER BY window_start DESC, detection_count DESC
+        LIMIT :limit OFFSET :offset
+    """
+    
+    # Get total count if requested
+    total_count = 0
+    if return_total:
+        count_query = f"""
+            WITH windowed AS (
+                SELECT 
+                    date_trunc('minute', ts) - 
+                        (EXTRACT(MINUTE FROM ts)::int % :window_minutes) * INTERVAL '1 minute' AS window_start,
+                    label,
+                    severity,
+                    model_name,
+                    device_id,
+                    COALESCE(dst_ip, '') AS dst_ip,
+                    COALESCE(dst_port::text, '') AS dst_port
+                FROM detections
+                WHERE {where_sql}
+            )
+            SELECT COUNT(DISTINCT (window_start, label, severity, model_name, device_id))
+            FROM windowed
+        """
+        count_result = await session.execute(text(count_query), params)
+        total_count = count_result.scalar() or 0
+    
+    result = await session.execute(text(incident_query), params)
+    rows = result.fetchall()
+    
+    # Generate short incident IDs from key fields
+    import hashlib
+    
+    incidents = []
+    for row in rows:
+        window_start = row[0]
+        window_end = row[1]
+        lbl = row[2] or ""
+        sev = row[3] or ""
+        model = row[4] or ""
+        dev = row[5] or ""
+        dst = row[6] or ""
+        port = row[7] or ""
+        count = row[8]
+        first_seen = row[9]
+        last_seen = row[10]
+        first_id = row[11]
+        
+        # Create short incident ID
+        key = f"{window_start}|{lbl}|{sev}|{model}|{dev}|{dst}|{port}"
+        incident_id = hashlib.md5(key.encode()).hexdigest()[:8].upper()
+        
+        incidents.append({
+            "incident_id": incident_id,
+            "window_start": window_start.isoformat() if window_start else None,
+            "window_end": window_end.isoformat() if window_end else None,
+            "window_fmt": window_start.strftime('%Y-%m-%d %H:%M') if window_start else '-',
+            "label": lbl,
+            "severity": sev,
+            "model_name": model,
+            "device_id": dev,
+            "dst_ip": dst if dst else None,
+            "dst_port": int(port) if port and port.isdigit() else None,
+            "flow": f"{dst}:{port}" if dst or port else None,
+            "detection_count": count,
+            # Display times in local timezone
+            "first_seen": format_local_iso(first_seen) if first_seen else None,
+            "last_seen": format_local_iso(last_seen) if last_seen else None,
+            "first_detection_id": first_id
+        })
+    
+    if return_total:
+        return incidents, total_count
+    return incidents
+
+
+async def get_incident_logs(
+    session: AsyncSession,
+    label: str,
+    severity: str,
+    model_name: str,
+    device_id: str,
+    window_start: str,
+    window_end: str,
+    dst_ip: str = None,
+    dst_port: int = None,
+    limit: int = 100
+) -> List[dict]:
+    """
+    Get raw detections for a specific incident (by window and key fields).
+    
+    Args:
+        label, severity, model_name, device_id: Incident identification fields
+        window_start, window_end: Time window (ISO format strings)
+        dst_ip, dst_port: Optional flow filters
+        limit: Maximum detections to return
+    
+    Returns:
+        List of detection dicts for this incident
+    """
+    query = """
+        SELECT id, ts, device_id, model_name, label, score, severity, details, src_ip, dst_ip, dst_port
+        FROM detections
+        WHERE ts >= :window_start::timestamptz
+          AND ts < :window_end::timestamptz
+          AND label = :label
+          AND severity = :severity
+          AND model_name = :model_name
+          AND device_id = :device_id
+    """
+    params = {
+        "window_start": window_start,
+        "window_end": window_end,
+        "label": label,
+        "severity": severity,
+        "model_name": model_name,
+        "device_id": device_id,
+        "limit": limit
+    }
+    
+    if dst_ip:
+        query += " AND dst_ip = :dst_ip"
+        params["dst_ip"] = dst_ip
+    
+    if dst_port:
+        query += " AND dst_port = :dst_port"
+        params["dst_port"] = dst_port
+    
+    query += " ORDER BY ts DESC LIMIT :limit"
+    
+    result = await session.execute(text(query), params)
+    rows = result.fetchall()
+    
+    return [
+        {
+            "id": row[0],
+            "ts": format_local_iso(row[1]) if row[1] else None,
+            "device_id": row[2],
+            "model_name": row[3],
+            "label": row[4],
+            "score": row[5],
+            "severity": row[6],
+            "details": row[7] if isinstance(row[7], dict) else json.loads(row[7]) if row[7] else {},
+            "src_ip": row[8],
+            "dst_ip": row[9],
+            "dst_port": row[10]
+        }
+        for row in rows
+    ]
+
+
+async def get_suricata_incident_raw_logs(
+    session: AsyncSession,
+    device_id: str,
+    label: str,
+    window_start: str,
+    window_end: str,
+    dst_ip: str = None,
+    dst_port: int = None,
+    limit: int = 200
+) -> Tuple[List[dict], int]:
+    """
+    Get raw Suricata events for a specific incident window.
+    
+    Unlike get_incident_logs() which queries the detections table,
+    this function queries the raw_events table where all Suricata
+    alerts are stored. This is essential for Suricata because detections
+    are deduplicated/aggregated, but raw_events has every single alert.
+    
+    Args:
+        device_id: Device that generated the alerts
+        label: Alert signature (e.g., "AI DDoS: TCP SYN flood")
+        window_start: Start of time window (ISO format)
+        window_end: End of time window (ISO format)
+        dst_ip: Optional destination IP filter
+        dst_port: Optional destination port filter
+        limit: Maximum events to return (default 200)
+    
+    Returns:
+        Tuple of (list of normalized event dicts, total count)
+    """
+    # Parse datetime params with proper timezone handling
+    ws_dt = parse_datetime_param(window_start)
+    we_dt = parse_datetime_param(window_end)
+    
+    if not ws_dt or not we_dt:
+        logger.error(f"Invalid window params: start={window_start}, end={window_end}")
+        return [], 0
+    
+    # Build WHERE clause - use proper datetime binding
+    where_clauses = [
+        "event_type = 'suricata'",
+        "device_id = :device_id",
+        "ts >= :window_start",
+        "ts < :window_end",
+        "payload->'alert'->>'signature' = :label"
+    ]
+    params = {
+        "device_id": device_id,
+        "window_start": ws_dt,  # Pass datetime objects directly
+        "window_end": we_dt,
+        "label": label,
+        "limit": limit
+    }
+    
+    # Optional dst_ip filter - check both 'dest_ip' and 'dst_ip' in payload
+    if dst_ip:
+        where_clauses.append("""
+            (payload->>'dest_ip' = :dst_ip OR payload->>'dst_ip' = :dst_ip)
+        """)
+        params["dst_ip"] = dst_ip
+    
+    # Optional dst_port filter
+    if dst_port:
+        where_clauses.append("""
+            (payload->>'dest_port' = :dst_port_str OR payload->>'dst_port' = :dst_port_str)
+        """)
+        params["dst_port_str"] = str(dst_port)
+    
+    where_sql = " AND ".join(where_clauses)
+    
+    # Count total matching events
+    count_query = f"""
+        SELECT COUNT(*) FROM raw_events WHERE {where_sql}
+    """
+    count_result = await session.execute(text(count_query), params)
+    total_count = count_result.scalar() or 0
+    
+    # If no results with exact match, try fallback with ILIKE
+    if total_count == 0:
+        # Debug: log recent raw_events to help diagnose
+        debug_query = text("""
+            SELECT 
+                ts,
+                payload->'alert'->>'signature' as sig
+            FROM raw_events
+            WHERE event_type = 'suricata'
+              AND device_id = :device_id
+              AND ts >= NOW() - INTERVAL '30 minutes'
+            ORDER BY ts DESC
+            LIMIT 5
+        """)
+        debug_result = await session.execute(debug_query, {"device_id": device_id})
+        debug_rows = debug_result.fetchall()
+        
+        recent_sigs = [f"{row[0]}: {row[1]}" for row in debug_rows] if debug_rows else ["none"]
+        logger.warning(
+            f"View Logs: 0 results for device={device_id}, label='{label}', "
+            f"window={window_start} to {window_end}. "
+            f"Recent signatures: {recent_sigs[:3]}"
+        )
+        
+        # Fallback: try ILIKE match (handles whitespace/encoding differences)
+        where_clauses_ilike = [
+            "event_type = 'suricata'",
+            "device_id = :device_id",
+            "ts >= :window_start",
+            "ts < :window_end",
+            "payload->'alert'->>'signature' ILIKE :label_pattern"
+        ]
+        params["label_pattern"] = f"%{label.strip()}%"
+        where_sql = " AND ".join(where_clauses_ilike)
+        
+        count_result = await session.execute(text(f"SELECT COUNT(*) FROM raw_events WHERE {where_sql}"), params)
+        total_count = count_result.scalar() or 0
+        
+        if total_count > 0:
+            logger.info(f"View Logs fallback ILIKE found {total_count} results")
+    
+    # Get events with limit
+    query = f"""
+        SELECT 
+            id,
+            ts,
+            device_id,
+            payload
+        FROM raw_events
+        WHERE {where_sql}
+        ORDER BY ts DESC
+        LIMIT :limit
+    """
+    
+    result = await session.execute(text(query), params)
+    rows = result.fetchall()
+    
+    # Normalize events for frontend display with local timezone
+    events = []
+    for row in rows:
+        payload = row[3] if isinstance(row[3], dict) else json.loads(row[3]) if row[3] else {}
+        alert = payload.get("alert", {})
+        
+        # Convert timestamp to local timezone for display
+        ts_local = format_local_iso(row[1]) if row[1] else None
+        
+        events.append({
+            "id": row[0],
+            "ts": ts_local,
+            "device_id": row[2],
+            "signature": alert.get("signature", ""),
+            "sid": alert.get("sid", alert.get("signature_id", 0)),
+            "category": alert.get("category", ""),
+            "severity": alert.get("severity", 3),
+            "src_ip": payload.get("src_ip", ""),
+            "src_port": payload.get("src_port", 0),
+            "dst_ip": payload.get("dest_ip", payload.get("dst_ip", "")),
+            "dst_port": payload.get("dest_port", payload.get("dst_port", 0)),
+            "proto": payload.get("proto", ""),
+            "flow_id": payload.get("flow_id"),
+            # Include label for consistency with incident logs format
+            "label": alert.get("signature", ""),
+            "score": 0.0,  # Raw events don't have scores
+        })
+    
+    return events, total_count
 
 
 async def get_raw_events(

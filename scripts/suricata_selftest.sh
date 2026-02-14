@@ -39,9 +39,15 @@ fi
 # ------------------------------------------------------------------------------
 # Step 2: Generate test traffic to trigger local.rules
 # ------------------------------------------------------------------------------
-echo -e "\n${YELLOW}[2/5] Generating test traffic (ping)...${NC}"
-ping -c 3 "$TEST_TARGET" > /dev/null 2>&1 || true
-echo -e "${GREEN}[+] Ping traffic sent to $TEST_TARGET${NC}"
+echo -e "\n${YELLOW}[2/5] Generating test traffic (Nmap XMAS Scan)...${NC}"
+# Ping doesn't trigger alerts, use Nmap XMAS scan which triggers sid:1000013
+if command -v nmap &> /dev/null; then
+    nmap -sX -p 80 "$TEST_TARGET" > /dev/null 2>&1 || true
+    echo -e "${GREEN}[+] Nmap XMAS scan sent to $TEST_TARGET${NC}"
+else
+    echo -e "${YELLOW}[!] Nmap not found, sending HTTP User-Agent scan...${NC}"
+    curl -s -A "Nmap Scripting Engine" "$TEST_TARGET" > /dev/null 2>&1 || true
+fi
 
 # Optional: send HTTP request with Nmap user-agent
 if command -v curl &> /dev/null; then
@@ -76,7 +82,8 @@ if docker ps --format '{{.Names}}' | grep -q "ai_db-suricata-collector"; then
     
     # Check collector logs for recent activity
     COLLECTOR_LOGS=$(docker logs ai_db-suricata-collector --tail 10 2>&1)
-    if echo "$COLLECTOR_LOGS" | grep -q "sent\|forwarded\|processed"; then
+    COLLECTOR_LOGS=$(docker logs ai_db-suricata-collector --tail 20 2>&1)
+    if echo "$COLLECTOR_LOGS" | grep -iE "sent|forwarded|processed|Alerts seen"; then
         echo -e "${GREEN}[+] Collector appears to be forwarding alerts${NC}"
     else
         echo -e "${YELLOW}[*] Collector running but no recent forwards detected${NC}"

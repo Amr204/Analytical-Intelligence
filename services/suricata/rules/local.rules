@@ -1,435 +1,81 @@
 # ==========================================
-# Analytical-Intelligence LOCAL IDS Rules
+# Analytical-Intelligence — LOCAL IDS Rules
 # ==========================================
-# OFFLINE MODE - No external feeds / No ET
-# Focus: DDoS, DoS, Port Scan, Botnet indicators
+# Ruleset focused on fast detections for:
+# DDoS, DoS, PortScan, Recon, BruteForce, Botnet, WebAttack, RCE, Malware
 #
-# NOTE: Tune thresholds based on your environment.
-# All rules use detection_filter for noise reduction.
+# Notes:
+# - SIDs start at 1000001 and increment sequentially.
+# - All rules use rev:1.
+# - PCRE characters like ';' are escaped as \;.
 # ==========================================
 
-# ==========================================================================
-# DDoS INDICATORS (Aggregate by Destination)
-# ==========================================================================
-# These detect distributed attacks where MANY sources hit ONE target
+# ------------------------------------------
+# 1. DDoS (Distributed Denial of Service)
+# Priority: 1 (Critical)
+# ------------------------------------------
+alert tcp any any -> any any (msg:"AI DDoS: TCP SYN flood (aggregate to destination)"; flags:S,12; detection_filter:track by_dst, count 10000, seconds 10; classtype:attempted-dos; priority:1; sid:1000001; rev:1;)
+alert udp any any -> any any (msg:"AI DDoS: UDP flood (aggregate to destination)"; detection_filter:track by_dst, count 10000, seconds 10; classtype:attempted-dos; priority:1; sid:1000002; rev:1;)
+alert icmp any any -> any any (msg:"AI DDoS: ICMP flood (aggregate to destination)"; itype:8; detection_filter:track by_dst, count 10000, seconds 10; classtype:attempted-dos; priority:1; sid:1000003; rev:1;)
+# ------------------------------------------
+# 2. DoS (Denial of Service)
+# Priority: 2 (High)
+# ------------------------------------------
+alert tcp any any -> any any (msg:"AI DoS: TCP SYN flood (single source)"; flags:S,12; detection_filter:track by_src, count 1000, seconds 3; classtype:attempted-dos; priority:2; sid:1000011; rev:1;)
+alert udp any any -> any any (msg:"AI DoS: UDP flood (single source)"; detection_filter:track by_src, count 1000, seconds 3; classtype:attempted-dos; priority:2; sid:1000012; rev:1;)
+alert icmp any any -> any any (msg:"AI DoS: ICMP ping flood (single source)"; itype:8; detection_filter:track by_src, count 1000, seconds 3; classtype:attempted-dos; priority:2; sid:1000013; rev:1;)
 
-alert tcp any any -> $HOME_NET any ( \
-    msg:"AI DDoS: TCP SYN flood (aggregate to destination)"; \
-    flow:to_server; \
-    flags:S; \
-    detection_filter:track by_dst, count 200, seconds 1; \
-    classtype:attempted-dos; \
-    priority:1; \
-    sid:1000001; rev:1; \
-)
+# ------------------------------------------
+# 3. PortScan (Port Scanning)
+# Priority: 3 (Medium)
+# ------------------------------------------
+alert tcp any any -> any any (msg:"AI PortScan: TCP SYN scan (rapid probes)"; flags:S,12; detection_filter:track by_src, count 15, seconds 5; classtype:attempted-recon; priority:3; sid:1000021; rev:1;)
+alert tcp any any -> any any (msg:"AI PortScan: TCP connect scan (bursty attempts)"; flags:S,12; detection_filter:track by_src, count 50, seconds 10; classtype:attempted-recon; priority:3; sid:1000022; rev:1;)
+alert udp any any -> any any (msg:"AI PortScan: UDP scan behavior"; detection_filter:track by_src, count 20, seconds 5; classtype:attempted-recon; priority:3; sid:1000023; rev:1;)
+alert tcp any any -> any any (msg:"AI PortScan: Xmas scan packet"; flags:FPU; classtype:attempted-recon; priority:3; sid:1000024; rev:1;)
+alert tcp any any -> any any (msg:"AI PortScan: Null scan packet"; flags:0; classtype:attempted-recon; priority:3; sid:1000025; rev:1;)
+alert tcp any any -> any any (msg:"AI PortScan: FIN scan packet"; flags:F; classtype:attempted-recon; priority:3; sid:1000026; rev:1;)
+alert udp any any -> any any (msg:"AI PortScan: Aggressive UDP scan (high-rate probes)"; detection_filter:track by_src, count 60, seconds 10; classtype:attempted-recon; priority:3; sid:1000035; rev:1;)
 
-alert udp any any -> $HOME_NET any ( \
-    msg:"AI DDoS: UDP flood (aggregate to destination)"; \
-    flow:to_server; \
-    detection_filter:track by_dst, count 500, seconds 1; \
-    classtype:attempted-dos; \
-    priority:1; \
-    sid:1000002; rev:1; \
-)
+# ------------------------------------------
+# 4. Recon (Reconnaissance / Scanners)
+# Priority: 3 (Medium)
+# ------------------------------------------
+alert icmp any any -> any any (msg:"AI Recon: ICMP ping sweep (echo request burst)"; itype:8; detection_filter:track by_src, count 15, seconds 5; classtype:attempted-recon; priority:3; sid:1000046; rev:1;)
+alert icmp any any -> any any (msg:"AI Recon: ICMP timestamp request"; itype:13; classtype:attempted-recon; priority:3; sid:1000047; rev:1;)
+alert icmp any any -> any any (msg:"AI Recon: ICMP address mask request"; itype:17; classtype:attempted-recon; priority:3; sid:1000048; rev:1;)
+alert arp any any -> any any (msg:"AI Recon: ARP scan (who-has burst)"; arp.opcode:1; detection_filter:track by_src, count 25, seconds 10; classtype:attempted-recon; priority:3; sid:1000049; rev:1;)
+alert dns any any -> any 53 (msg:"AI Recon: DNS CHAOS version.bind TXT query"; dns.query; content:"version.bind"; nocase; dns.rrtype:TXT; classtype:attempted-recon; priority:3; sid:1000050; rev:1;)
+alert dns any any -> any 53 (msg:"AI Recon: DNS CHAOS hostname.bind TXT query"; dns.query; content:"hostname.bind"; nocase; dns.rrtype:TXT; classtype:attempted-recon; priority:3; sid:1000051; rev:1;)
 
-alert icmp any any -> $HOME_NET any ( \
-    msg:"AI DDoS: ICMP flood (aggregate to destination)"; \
-    itype:8; \
-    detection_filter:track by_dst, count 200, seconds 1; \
-    classtype:attempted-dos; \
-    priority:1; \
-    sid:1000003; rev:1; \
-)
+# User-Agent Scanners
+alert http any any -> any any (msg:"AI Recon: Nmap user-agent"; flow:to_server,established; http.user_agent; content:"Nmap"; nocase; classtype:attempted-recon; priority:3; sid:1000052; rev:1;)
+alert http any any -> any any (msg:"AI Recon: Nikto user-agent"; flow:to_server,established; http.user_agent; content:"Nikto"; nocase; classtype:attempted-recon; priority:3; sid:1000053; rev:1;)
+alert http any any -> any any (msg:"AI Recon: Nessus user-agent"; flow:to_server,established; http.user_agent; content:"Nessus"; nocase; classtype:attempted-recon; priority:3; sid:1000055; rev:1;)
+alert http any any -> any any (msg:"AI Recon: OpenVAS user-agent"; flow:to_server,established; http.user_agent; content:"OpenVAS"; nocase; classtype:attempted-recon; priority:3; sid:1000056; rev:1;)
+alert http any any -> any any (msg:"AI Recon: Acunetix user-agent"; flow:to_server,established; http.user_agent; content:"Acunetix"; nocase; classtype:attempted-recon; priority:3; sid:1000057; rev:1;)
+alert http any any -> any any (msg:"AI Recon: w3af user-agent"; flow:to_server,established; http.user_agent; content:"w3af"; nocase; classtype:attempted-recon; priority:3; sid:1000058; rev:1;)
+alert http any any -> any any (msg:"AI Recon: Arachni user-agent"; flow:to_server,established; http.user_agent; content:"Arachni"; nocase; classtype:attempted-recon; priority:3; sid:1000059; rev:1;)
+alert http any any -> any any (msg:"AI Recon: Gobuster user-agent"; flow:to_server,established; http.user_agent; content:"gobuster"; nocase; classtype:attempted-recon; priority:3; sid:1000060; rev:1;)
+alert http any any -> any any (msg:"AI Recon: WPScan user-agent"; flow:to_server,established; http.user_agent; content:"wpscan"; nocase; classtype:attempted-recon; priority:3; sid:1000061; rev:1;)
+alert http any any -> any any (msg:"AI Recon: DirBuster user-agent"; flow:to_server,established; http.user_agent; content:"DirBuster"; nocase; classtype:attempted-recon; priority:3; sid:1000062; rev:1;)
+alert http any any -> any any (msg:"AI Recon: WhatWeb user-agent"; flow:to_server,established; http.user_agent; content:"WhatWeb"; nocase; classtype:attempted-recon; priority:3; sid:1000063; rev:1;)
+alert http any any -> any any (msg:"AI Recon: zgrab user-agent"; flow:to_server,established; http.user_agent; content:"zgrab"; nocase; classtype:attempted-recon; priority:3; sid:1000064; rev:1;)
+alert http any any -> any any (msg:"AI Recon: nuclei user-agent"; flow:to_server,established; http.user_agent; content:"nuclei"; nocase; classtype:attempted-recon; priority:3; sid:1000065; rev:1;)
 
-# ==========================================================================
-# DoS INDICATORS (Single Source)
-# ==========================================================================
-# These detect single-source attacks flooding a target
+# ------------------------------------------
+# 5. Botnet (C2 / Beaconing)
+# Priority: 1 (Critical)
+# ------------------------------------------
+alert dns any any -> any 53 (msg:"AI Botnet: High-rate DNS queries (beaconing)"; dns.query; content:"."; detection_filter:track by_src, count 20, seconds 60; classtype:trojan-activity; priority:1; sid:1000072; rev:1;)
+alert dns any any -> any 53 (msg:"AI Botnet: Suspicious DNS TXT query"; dns.rrtype:TXT; classtype:trojan-activity; priority:1; sid:1000073; rev:1;)
 
-alert tcp any any -> $HOME_NET any ( \
-    msg:"AI DoS: TCP SYN flood (single source)"; \
-    flow:to_server; \
-    flags:S; \
-    detection_filter:track by_src, count 120, seconds 1; \
-    classtype:attempted-dos; \
-    priority:2; \
-    sid:1000004; rev:1; \
-)
-
-alert udp any any -> $HOME_NET any ( \
-    msg:"AI DoS: UDP flood (single source)"; \
-    flow:to_server; \
-    detection_filter:track by_src, count 300, seconds 1; \
-    classtype:attempted-dos; \
-    priority:2; \
-    sid:1000005; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI DoS: HTTP request flood (high rate)"; \
-    flow:to_server,established; \
-    http.method; \
-    content:"GET"; nocase; \
-    detection_filter:track by_src, count 80, seconds 5; \
-    classtype:web-application-attack; \
-    priority:2; \
-    sid:1000006; rev:1; \
-)
-
-# ==========================================================================
-# PORT SCAN INDICATORS (Advanced)
-# ==========================================================================
-# Detect reconnaissance behavior (scanning for open ports)
-
-alert tcp any any -> $HOME_NET any ( \
-    msg:"AI PortScan: TCP SYN scan behavior (rapid probes)"; \
-    flags:S; \
-    flow:to_server; \
-    detection_filter:track by_src, count 25, seconds 3; \
-    classtype:attempted-recon; \
-    priority:2; \
-    sid:1000010; rev:1; \
-)
-
-alert tcp any any -> $HOME_NET any ( \
-    msg:"AI PortScan: TCP connect scan (established bursts)"; \
-    flow:to_server,established; \
-    detection_filter:track by_src, count 100, seconds 5; \
-    classtype:attempted-recon; \
-    priority:3; \
-    sid:1000011; rev:1; \
-)
-
-alert udp any any -> $HOME_NET any ( \
-    msg:"AI PortScan: UDP scan behavior"; \
-    flow:to_server; \
-    detection_filter:track by_src, count 30, seconds 5; \
-    classtype:attempted-recon; \
-    priority:3; \
-    sid:1000012; rev:1; \
-)
-
-# Nmap-specific scan types (Reconnaissance)
-alert tcp any any -> $HOME_NET any ( \
-    msg:"AI PortScan: Nmap XMAS scan (FPU flags set)"; \
-    flags:FPU; \
-    flow:to_server; \
-    classtype:attempted-recon; \
-    priority:2; \
-    sid:1000013; rev:1; \
-)
-
-alert tcp any any -> $HOME_NET any ( \
-    msg:"AI PortScan: Nmap NULL scan (No flags set)"; \
-    flags:0; \
-    flow:to_server; \
-    classtype:attempted-recon; \
-    priority:2; \
-    sid:1000014; rev:1; \
-)
-
-alert tcp any any -> $HOME_NET any ( \
-    msg:"AI PortScan: Nmap FIN scan (FIN flag only)"; \
-    flags:F; \
-    flow:to_server; \
-    classtype:attempted-recon; \
-    priority:2; \
-    sid:1000015; rev:1; \
-)
-
-# Advanced Recon: Nmap Scripting Engine (NSE) Detection
-alert http any any -> $HOME_NET any ( \
-    msg:"AI Recon: Nmap Scripting Engine (NSE) User-Agent"; \
-    flow:to_server,established; \
-    http.user_agent; \
-    content:"Nmap Scripting Engine"; nocase; \
-    classtype:attempted-recon; \
-    priority:2; \
-    sid:1000016; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI Recon: Nikto Vulnerability Scanner"; \
-    flow:to_server,established; \
-    http.user_agent; \
-    content:"Nikto"; nocase; \
-    classtype:attempted-recon; \
-    priority:2; \
-    sid:1000017; rev:1; \
-)
-
-# ==========================================================================
-# BOTNET/C2 INDICATORS (Heuristic - Generic Patterns)
-# ==========================================================================
-# These are NOT external feeds. They detect generic suspicious behavior.
-# Expect some false positives; tune carefully.
-
-# IRC-like outbound C2 behavior (legacy botnet indicator)
-alert tcp $HOME_NET any -> $EXTERNAL_NET 6667 ( \
-    msg:"AI Botnet: Possible IRC C2 outbound (port 6667)"; \
-    flow:to_server,established; \
-    classtype:trojan-activity; \
-    priority:2; \
-    sid:1000020; rev:1; \
-)
-
-alert tcp $HOME_NET any -> $EXTERNAL_NET 6668:6669 ( \
-    msg:"AI Botnet: Possible IRC C2 outbound (alt ports)"; \
-    flow:to_server,established; \
-    classtype:trojan-activity; \
-    priority:2; \
-    sid:1000021; rev:1; \
-)
-
-# Suspicious DNS tunneling-like pattern: very long subdomain labels
-alert dns $HOME_NET any -> any any ( \
-    msg:"AI Botnet: Suspicious long DNS query (possible tunneling)"; \
-    dns.query; \
-    pcre:"/^[a-z0-9]{25,}\./i"; \
-    detection_filter:track by_src, count 10, seconds 60; \
-    classtype:trojan-activity; \
-    priority:3; \
-    sid:1000022; rev:1; \
-)
-
-# High-rate DNS queries (beaconing / DGA-ish symptom)
-alert dns $HOME_NET any -> any any ( \
-    msg:"AI Botnet: High-rate DNS queries (possible beaconing)"; \
-    dns.query; \
-    detection_filter:track by_src, count 120, seconds 60; \
-    classtype:trojan-activity; \
-    priority:3; \
-    sid:1000023; rev:1; \
-)
-
-# Periodic small HTTP requests beaconing symptom
-alert http $HOME_NET any -> $EXTERNAL_NET any ( \
-    msg:"AI Botnet: Repeated HTTP GETs (possible beaconing)"; \
-    flow:to_server,established; \
-    http.method; content:"GET"; nocase; \
-    detection_filter:track by_src, count 60, seconds 300; \
-    classtype:trojan-activity; \
-    priority:4; \
-    sid:1000024; rev:1; \
-)
-
-# ==========================================================================
-# BRUTE FORCE INDICATORS
-# ==========================================================================
-
-alert tcp any any -> $HOME_NET 22 ( \
-    msg:"AI BruteForce: SSH connection attempts"; \
-    flags:S; \
-    detection_filter:track by_src, count 5, seconds 60; \
-    classtype:attempted-admin; \
-    priority:2; \
-    sid:1000030; rev:1; \
-)
-
-alert tcp any any -> $HOME_NET 3389 ( \
-    msg:"AI BruteForce: RDP connection attempts"; \
-    flags:S; \
-    detection_filter:track by_src, count 5, seconds 60; \
-    classtype:attempted-admin; \
-    priority:2; \
-    sid:1000031; rev:1; \
-)
-
-alert tcp any any -> $HOME_NET 21 ( \
-    msg:"AI BruteForce: FTP connection attempts"; \
-    flags:S; \
-    detection_filter:track by_src, count 10, seconds 60; \
-    classtype:attempted-admin; \
-    priority:3; \
-    sid:1000032; rev:1; \
-)
-
-# ==========================================================================
-# WEB ATTACK INDICATORS (Deep)
-# ==========================================================================
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI WebAttack: SQL Injection attempt (UNION SELECT)"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"UNION"; nocase; \
-    content:"SELECT"; nocase; distance:0; \
-    classtype:web-application-attack; \
-    priority:2; \
-    sid:1000040; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI WebAttack: SQL Injection attempt (OR 1=1 Logic)"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"OR"; nocase; \
-    content:"1=1"; distance:0; within:10; \
-    classtype:web-application-attack; \
-    priority:2; \
-    sid:1000041; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI WebAttack: SQL Injection attempt (Probe/Benchmark)"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"benchmark"; nocase; \
-    content:"("; distance:0; \
-    classtype:web-application-attack; \
-    priority:2; \
-    sid:1000046; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI WebAttack: XSS attempt (script tag)"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"<script"; nocase; \
-    classtype:web-application-attack; \
-    priority:2; \
-    sid:1000042; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI WebAttack: XSS attempt (javascript protocol)"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"javascript:"; nocase; \
-    classtype:web-application-attack; \
-    priority:2; \
-    sid:1000045; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI WebAttack: Path traversal attempt (../)"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"../"; \
-    classtype:web-application-attack; \
-    priority:2; \
-    sid:1000043; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI WebAttack: LFI /etc/passwd attempt"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"/etc/passwd"; nocase; \
-    classtype:web-application-attack; \
-    priority:1; \
-    sid:1000044; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI WebAttack: LFI php://input Wrapper"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"php://input"; nocase; \
-    classtype:web-application-attack; \
-    priority:2; \
-    sid:1000047; rev:1; \
-)
-
-# ==========================================================================
-# COMMAND INJECTION & RCE (Professional Detection)
-# ==========================================================================
-# Detects malicious commands executed via web exploits or backdoors.
-# Low FP focus: Checks for command Chaining/Pipes or specific binaries in URIs.
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI RCE: Command Injection (Attempt to download external file)"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"wget "; nocase; \
-    pcre:"/wget\s+http/i"; \
-    classtype:web-application-attack; \
-    priority:1; \
-    sid:1000050; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI RCE: Command Injection (Attempt to curl external file)"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"curl "; nocase; \
-    pcre:"/curl\s+http/i"; \
-    classtype:web-application-attack; \
-    priority:1; \
-    sid:1000051; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI RCE: Linux Binary Execution Attempt (/bin/sh)"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"/bin/sh"; nocase; \
-    classtype:system-call-detect; \
-    priority:1; \
-    sid:1000052; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI RCE: Linux Binary Execution Attempt (/bin/bash)"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"/bin/bash"; nocase; \
-    classtype:system-call-detect; \
-    priority:1; \
-    sid:1000053; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI RCE: Suspicious permission change (chmod +x)"; \
-    flow:to_server,established; \
-    http.uri; \
-    content:"chmod"; nocase; \
-    content:"+x"; distance:0; within:10; \
-    classtype:web-application-attack; \
-    priority:2; \
-    sid:1000054; rev:1; \
-)
-
-alert http any any -> $HOME_NET any ( \
-    msg:"AI RCE: Suspicious Command Chaining (Pipe/Redirect)"; \
-    flow:to_server,established; \
-    http.uri; \
-    pcre:"/(;|\||&&)\s*(nc|bash|sh|python|perl|ruby)\s+/i"; \
-    classtype:web-application-attack; \
-    priority:1; \
-    sid:1000055; rev:1; \
-)
-
-# ==========================================================================
-# MALWARE & REVERSE SHELL INDICATORS (Post-Exploitation)
-# ==========================================================================
-
-alert tcp $HOME_NET any -> $EXTERNAL_NET any ( \
-    msg:"AI Malware: Potential Reverse Shell Prompt (root@)"; \
-    flow:from_server,established; \
-    content:"root@"; depth:10; \
-    content:"#"; distance:0; within:50; \
-    classtype:trojan-activity; \
-    priority:1; \
-    sid:1000060; rev:1; \
-)
-
-alert tcp $HOME_NET any -> $EXTERNAL_NET any ( \
-    msg:"AI Malware: Potential Reverse Shell (id command output)"; \
-    flow:from_server,established; \
-    content:"uid="; depth:10; \
-    content:"gid="; distance:0; within:20; \
-    content:"groups="; distance:0; within:20; \
-    classtype:trojan-activity; \
-    priority:1; \
-    sid:1000061; rev:1; \
-)
-
-alert tcp $HOME_NET any -> $EXTERNAL_NET any ( \
-    msg:"AI Malware: Suspicious cleartext password file read"; \
-    flow:from_server,established; \
-    content:"root:x:0:0:"; \
-    classtype:policy-violation; \
-    priority:1; \
-    sid:1000062; rev:1; \
-)
+# ------------------------------------------
+# 6. WebAttack (Web Attacks)
+# Priority: 2 (High)
+# ------------------------------------------
+alert http any any -> any any (msg:"AI WebAttack: XSS (script tag)"; flow:to_server,established; http.uri; content:"<script"; nocase; classtype:web-application-attack; priority:2; sid:1000076; rev:1;)
+alert http any any -> any any (msg:"AI WebAttack: XSS (javascript protocol)"; flow:to_server,established; http.uri; content:"javascript:"; nocase; classtype:web-application-attack; priority:2; sid:1000078; rev:1;)
+alert http any any -> any any (msg:"AI WebAttack: Suspicious cmd parameter"; flow:to_server,established; http.uri; content:"cmd="; nocase; classtype:web-application-attack; priority:2; sid:1000079; rev:1;)
+alert http any any -> any any (msg:"AI RCE: /bin/sh attempt"; flow:to_server,established; http.uri; content:"/bin/sh"; nocase; classtype:web-application-attack; priority:1; sid:1000082; rev:1;)
+alert http any any -> any any (msg:"AI RCE: /bin/bash attempt"; flow:to_server,established; http.uri; content:"/bin/bash"; nocase; classtype:web-application-attack; priority:1; sid:1000083; rev:1;)

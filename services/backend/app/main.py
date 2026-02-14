@@ -16,7 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.models_loader import load_all_models
-from app.schemas import HealthResponse
+from app.schemas import HealthResponse, ErrorResponse
 from app.ui import router as ui_router
 from app.ingest import auth_router, suricata_router
 from app.db import ensure_schema
@@ -93,18 +93,89 @@ async def lifespan(app: FastAPI):
         set_notification_bus(None)
 
 
+# ── OpenAPI tag metadata ────────────────────────────────────────────────
+OPENAPI_TAGS = [
+    {
+        "name": "Health",
+        "description": "System health-check and ML model readiness probes.",
+    },
+    {
+        "name": "Dashboard",
+        "description": (
+            "Aggregate statistics and chart-ready analytics consumed by the web dashboard. "
+            "Includes **timeseries**, **severity breakdown**, **top attackers**, and **device heatmaps**."
+        ),
+    },
+    {
+        "name": "Incidents",
+        "description": (
+            "Detection alerts grouped into time-windowed incidents. "
+            "Use the **drilldown** endpoint to fetch raw logs for forensic analysis."
+        ),
+    },
+    {
+        "name": "Devices",
+        "description": (
+            "Registered sensor / device inventory. "
+            "Each device has an approval status (`allowed` · `pending` · `blocked`) "
+            "and real-time online/offline tracking."
+        ),
+    },
+    {
+        "name": "Reports",
+        "description": "Export filtered detections as **CSV** or **XLSX** files (max 5 000 rows).",
+    },
+    {
+        "name": "Ingestion",
+        "description": (
+            "Receive raw events from sensor agents deployed on monitored hosts.\n\n"
+            "🔑 **All endpoints require the `INGEST_API_KEY` header** — "
+            "click **Authorize** above to set it."
+        ),
+    },
+]
+
+
 # Create FastAPI app
 app = FastAPI(
-    title="Analytical-Intelligence v1",
-    description="Real-time Security Information and Event Management",
+    title="Analytical-Intelligence API",
+    description=(
+        "### Real-time Security Information & Event Management (SIEM)\n\n"
+        "---\n\n"
+        "| Capability | Description |\n"
+        "| :--- | :--- |\n"
+        "| **SSH Anomaly Detection** | LSTM-based model detects brute-force & lateral movement |\n"
+        "| **Suricata IDS** | Ingests & deduplicates IDS alerts with bucket windowing |\n"
+        "| **Live Dashboard** | Real-time charts, severity breakdown, top attackers |\n"
+        "| **Device Inventory** | Auto-registers sensors with approval workflow |\n"
+        "| **Report Export** | One-click CSV / XLSX exports with severity & device filters |\n\n"
+        "---\n\n"
+        "#### Authentication\n\n"
+        "| Method | Scope | How |\n"
+        "| :--- | :--- | :--- |\n"
+        "| **Session cookie** | Web UI pages | Login via `/login` |\n"
+        "| **API Key header** | `/api/v1/ingest/*` | `INGEST_API_KEY` header — click 🔒 **Authorize** above |\n"
+        "| **None** | Read-only JSON APIs | Protected by network policy |\n\n"
+    ),
     version="1.0.0",
-    lifespan=lifespan
+    contact={
+        "name": "Analytical-Intelligence Team",
+        "url": settings.app_github_url or None,
+    },
+    license_info={
+        "name": "MIT",
+    },
+    openapi_tags=OPENAPI_TAGS,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 
 # Paths that don't require login
 PUBLIC_PATHS = {"/login", "/logout"}
-PUBLIC_PREFIXES = ("/static/", "/api/")
+PUBLIC_PREFIXES = ("/static/", "/api/", "/docs", "/redoc", "/openapi.json")
 
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -153,7 +224,17 @@ app.include_router(auth_router)
 app.include_router(suricata_router)
 
 
-@app.get("/api/v1/health", response_model=HealthResponse, tags=["system"])
+@app.get(
+    "/api/v1/health",
+    response_model=HealthResponse,
+    tags=["Health"],
+    summary="Service health check",
+    description="Returns the current service status, UTC timestamp, and API version. "
+                "Used by Docker HEALTHCHECK and monitoring systems.",
+    responses={
+        200: {"description": "Service is healthy"},
+    },
+)
 async def health_check():
     """Health check endpoint."""
     return HealthResponse(

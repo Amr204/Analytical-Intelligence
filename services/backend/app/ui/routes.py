@@ -4,7 +4,7 @@ Server-rendered HTML pages using Jinja2 templates.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from io import StringIO, BytesIO
 import csv
 import json
@@ -19,6 +19,9 @@ from app.db import (
     get_stats, 
     get_recent_detections,
     get_detections_filtered,
+    get_incidents_filtered,
+    get_incident_logs,
+    get_suricata_incident_raw_logs,
     get_raw_events,
     get_devices_summary,
     get_device_detail,
@@ -27,6 +30,17 @@ from app.db import (
     set_device_approval_status
 )
 from app.models_loader import get_models_status
+from app.schemas import (
+    ErrorResponse,
+    StatsResponse,
+    DetectionItem,
+    DeviceSummaryItem,
+    DeviceDetailResponse,
+    DashboardAnalyticsResponse,
+    ModelsHealthResponse,
+    IncidentLogResponse,
+    ReportExportError,
+)
 from app.auth import (
     get_user_by_username,
     get_user_login_state,
@@ -37,7 +51,7 @@ from app.auth import (
     is_account_locked
 )
 
-router = APIRouter(tags=["ui"])
+router = APIRouter()
 
 # Templates directory
 templates = Jinja2Templates(directory="app/templates")
@@ -62,7 +76,7 @@ def get_current_user(request: Request) -> Optional[dict]:
 # Authentication Routes
 # =====================================================
 
-@router.get("/login", response_class=HTMLResponse)
+@router.get("/login", response_class=HTMLResponse, include_in_schema=False)
 async def login_page(request: Request, next: str = "/dashboard"):
     """Login page."""
     # If already logged in, redirect
@@ -77,7 +91,7 @@ async def login_page(request: Request, next: str = "/dashboard"):
     })
 
 
-@router.post("/login")
+@router.post("/login", include_in_schema=False)
 async def login_submit(
     request: Request,
     username: str = Form(...),
@@ -133,7 +147,7 @@ async def login_submit(
     })
 
 
-@router.get("/logout")
+@router.get("/logout", include_in_schema=False)
 async def logout(request: Request):
     """Logout and clear session."""
     request.session.clear()
@@ -144,7 +158,7 @@ async def logout(request: Request):
 # Device Approval Routes  
 # =====================================================
 
-@router.post("/devices/{device_id}/allow")
+@router.post("/devices/{device_id}/allow", include_in_schema=False)
 async def allow_device(
     request: Request,
     device_id: str,
@@ -165,7 +179,7 @@ async def allow_device(
     return RedirectResponse(url=f"/devices/{device_id}", status_code=303)
 
 
-@router.post("/devices/{device_id}/block")
+@router.post("/devices/{device_id}/block", include_in_schema=False)
 async def block_device(
     request: Request,
     device_id: str,
@@ -187,7 +201,7 @@ async def block_device(
     return RedirectResponse(url=f"/devices/{device_id}", status_code=303)
 
 
-@router.post("/devices/{device_id}/pending")
+@router.post("/devices/{device_id}/pending", include_in_schema=False)
 async def set_device_pending(
     request: Request,
     device_id: str,
@@ -208,7 +222,7 @@ async def set_device_pending(
 # =====================================================
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def home_page(request: Request):
     """Home landing page."""
     from app.config import settings
@@ -227,7 +241,7 @@ async def home_page(request: Request):
     })
 
 
-@router.get("/dashboard", response_class=HTMLResponse)
+@router.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
 async def dashboard(
     request: Request,
     session: AsyncSession = Depends(get_session)
@@ -290,17 +304,31 @@ async def dashboard(
     })
 
 
-@router.get("/alerts", response_class=HTMLResponse)
+@router.get("/alerts", response_class=HTMLResponse, include_in_schema=False)
 async def alerts_page(
     request: Request,
+    view: Optional[str] = Query("incidents"),  # incidents or raw
     severity: Optional[str] = Query(None),
     model_name: Optional[str] = Query(None),
     label: Optional[str] = Query(None),
     device_id: Optional[str] = Query(None),
     last_minutes: Optional[str] = Query(None),
+    window_minutes: Optional[int] = Query(5),  # Incident grouping window
+    page: Optional[int] = Query(1),
+    per_page: Optional[int] = Query(25),
     session: AsyncSession = Depends(get_session)
 ):
-    """Alerts/detections list page with filters."""
+    """
+    Alerts/detections list page with filters and incident grouping.
+    
+    view=incidents: Show grouped incidents within time windows
+    view=raw: Show raw detection logs with pagination
+    """
+    # Normalize view parameter
+    view = view.lower() if view else "incidents"
+    if view not in ("incidents", "raw"):
+        view = "incidents"
+    
     # Convert last_minutes to int, handling empty string
     last_minutes_int = int(last_minutes) if last_minutes and last_minutes.strip() else None
     
@@ -310,59 +338,184 @@ async def alerts_page(
     label_clean = label if label and label.strip() else None
     device_id_clean = device_id if device_id and device_id.strip() else None
     
-    detections = await get_detections_filtered(
-        session,
-        severity=severity_clean,
-        model_name=model_name_clean,
-        label=label_clean,
-        device_id=device_id_clean,
-        last_minutes=last_minutes_int,
-        limit=100
-    )
+    # Ensure valid pagination values
+    page = max(1, page or 1)
+    per_page = min(100, max(10, per_page or 25))
+    window_minutes = max(1, min(60, window_minutes or 5))
+    offset = (page - 1) * per_page
+    
+    # Build query string for pagination (preserving filters)
+    def build_query_string(exclude_keys=None):
+        exclude_keys = exclude_keys or []
+        params = []
+        if view and "view" not in exclude_keys:
+            params.append(f"view={view}")
+        if severity_clean and "severity" not in exclude_keys:
+            params.append(f"severity={severity_clean}")
+        if model_name_clean and "model_name" not in exclude_keys:
+            params.append(f"model_name={model_name_clean}")
+        if label_clean and "label" not in exclude_keys:
+            params.append(f"label={label_clean}")
+        if device_id_clean and "device_id" not in exclude_keys:
+            params.append(f"device_id={device_id_clean}")
+        if last_minutes_int and "last_minutes" not in exclude_keys:
+            params.append(f"last_minutes={last_minutes_int}")
+        if window_minutes and "window_minutes" not in exclude_keys:
+            params.append(f"window_minutes={window_minutes}")
+        if per_page and "per_page" not in exclude_keys:
+            params.append(f"per_page={per_page}")
+        return "&" + "&".join(params) if params else ""
+    
+    query_string = build_query_string(exclude_keys=["page"])
+    
+    # Fetch data based on view type
+    if view == "incidents":
+        incidents, total_count = await get_incidents_filtered(
+            session,
+            severity=severity_clean,
+            model_name=model_name_clean,
+            label=label_clean,
+            device_id=device_id_clean,
+            window_minutes=window_minutes,
+            last_minutes=last_minutes_int,
+            limit=per_page,
+            offset=offset,
+            return_total=True
+        )
+        detections = []
+    else:  # view == "raw"
+        incidents = []
+        detections_raw, total_count = await get_detections_filtered(
+            session,
+            severity=severity_clean,
+            model_name=model_name_clean,
+            label=label_clean,
+            device_id=device_id_clean,
+            last_minutes=last_minutes_int,
+            limit=per_page,
+            offset=offset,
+            return_total=True
+        )
+        # Pre-serialize details to JSON for each detection
+        detections = []
+        for d in detections_raw:
+            details = d.get("details", {}) or {}
+            det_dict = {
+                "id": d.get("id"),
+                "ts": str(d.get("ts", ""))[:19] if d.get("ts") else None,
+                "severity": d.get("severity"),
+                "model_name": d.get("model_name"),
+                "label": d.get("label"),
+                "device_id": d.get("device_id"),
+                "score": float(d.get("score", 0) or 0),
+                "details": details,
+                "details_json": json.dumps(details, default=str),
+                "src_ip": details.get("src_ip", ""),
+                "src_port": details.get("src_port", ""),
+                "dst_ip": details.get("dst_ip", ""),
+                "dst_port": details.get("dst_port", ""),
+            }
+            detections.append(det_dict)
+    
+    # Calculate pagination info
+    total_pages = max(1, (total_count + per_page - 1) // per_page)
+    
+    pagination = {
+        "page": page,
+        "per_page": per_page,
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "query_string": query_string,
+        "has_prev": page > 1,
+        "has_next": page < total_pages,
+    }
     
     # Get device list for filter dropdown
     device_ids = await get_all_device_ids(session)
     
-    # Pre-serialize details to JSON for each detection (avoids tojson issues in template)
-    # Note: get_detections_filtered already returns dicts, so use dict key access
-    detections_with_json = []
-    for d in detections:
-        details = d.get("details", {}) or {}
-        det_dict = {
-            "id": d.get("id"),
-            "ts": str(d.get("ts", ""))[:19] if d.get("ts") else None,
-            "severity": d.get("severity"),
-            "model_name": d.get("model_name"),
-            "label": d.get("label"),
-            "device_id": d.get("device_id"),
-            "score": float(d.get("score", 0) or 0),
-            "details": details,
-            "details_json": json.dumps(details, default=str),
-            # Extract flow information from details
-            "src_ip": details.get("src_ip", ""),
-            "src_port": details.get("src_port", ""),
-            "dst_ip": details.get("dst_ip", ""),
-            "dst_port": details.get("dst_port", ""),
-        }
-        detections_with_json.append(det_dict)
-    
     return templates.TemplateResponse("alerts.html", {
         "request": request,
-        "detections": detections_with_json,
+        "view": view,
+        "incidents": incidents,
+        "detections": detections,
         "device_ids": device_ids,
+        "pagination": pagination,
         "filters": {
             "severity": severity_clean,
             "model_name": model_name_clean,
             "label": label_clean,
             "device_id": device_id_clean,
-            "last_minutes": last_minutes_int
+            "last_minutes": last_minutes_int,
+            "window_minutes": window_minutes
         },
         "page_title": "Alerts",
         "now": datetime.utcnow().isoformat()
     })
 
 
-@router.get("/devices", response_class=HTMLResponse)
+@router.get(
+    "/api/v1/incidents/logs",
+    tags=["Incidents"],
+    summary="Get raw logs for an incident",
+    description="Fetch individual detection or raw-event logs for a specific incident "
+                "identified by its label, severity, model, device, and time window. "
+                "Suricata incidents query the raw_events table; others query detections.",
+    response_model=IncidentLogResponse,
+    responses={500: {"model": ErrorResponse}},
+)
+async def api_incident_logs(
+    label: str = Query(..., description="Incident label / signature"),
+    severity: str = Query(..., description="Severity level"),
+    model_name: str = Query(..., description="Detection model name (e.g. suricata, ssh_lstm)"),
+    device_id: str = Query(..., description="Device identifier"),
+    window_start: str = Query(..., description="ISO-8601 window start (UTC)"),
+    window_end: str = Query(..., description="ISO-8601 window end (UTC)"),
+    dst_ip: Optional[str] = Query(None, description="Filter by destination IP"),
+    dst_port: Optional[int] = Query(None, description="Filter by destination port"),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    API endpoint to fetch raw logs for a specific incident.
+    
+    For Suricata incidents, queries raw_events table to show all alerts.
+    For other models (SSH LSTM), queries detections table.
+    """
+    if model_name == "suricata":
+        # Suricata: query raw_events for all alerts in the window
+        logs, total_count = await get_suricata_incident_raw_logs(
+            session,
+            device_id=device_id,
+            label=label,
+            window_start=window_start,
+            window_end=window_end,
+            dst_ip=dst_ip if dst_ip else None,
+            dst_port=dst_port if dst_port else None,
+            limit=200
+        )
+        return {
+            "logs": logs, 
+            "count": len(logs),
+            "total_count": total_count,
+            "source": "raw_events"
+        }
+    else:
+        # SSH LSTM and other models: use existing detection logs
+        logs = await get_incident_logs(
+            session,
+            label=label,
+            severity=severity,
+            model_name=model_name,
+            device_id=device_id,
+            window_start=window_start,
+            window_end=window_end,
+            dst_ip=dst_ip if dst_ip else None,
+            dst_port=dst_port if dst_port else None,
+            limit=100
+        )
+        return {"logs": logs, "count": len(logs), "source": "detections"}
+
+
+@router.get("/devices", response_class=HTMLResponse, include_in_schema=False)
 async def devices_page(
     request: Request,
     session: AsyncSession = Depends(get_session)
@@ -378,7 +531,7 @@ async def devices_page(
     })
 
 
-@router.get("/devices/{device_id}", response_class=HTMLResponse)
+@router.get("/devices/{device_id}", response_class=HTMLResponse, include_in_schema=False)
 async def device_detail_page(
     request: Request,
     device_id: str,
@@ -407,7 +560,7 @@ async def device_detail_page(
     })
 
 
-@router.get("/events/auth", response_class=HTMLResponse)
+@router.get("/events/auth", response_class=HTMLResponse, include_in_schema=False)
 async def auth_events_page(
     request: Request,
     session: AsyncSession = Depends(get_session)
@@ -423,7 +576,7 @@ async def auth_events_page(
     })
 
 
-@router.get("/events/flows", response_class=HTMLResponse)
+@router.get("/events/flows", response_class=HTMLResponse, include_in_schema=False)
 async def flow_events_page(
     request: Request,
     session: AsyncSession = Depends(get_session)
@@ -439,7 +592,7 @@ async def flow_events_page(
     })
 
 
-@router.get("/events/suricata", response_class=HTMLResponse)
+@router.get("/events/suricata", response_class=HTMLResponse, include_in_schema=False)
 async def suricata_events_page(
     request: Request,
     severity: Optional[str] = Query(None),
@@ -545,7 +698,7 @@ async def suricata_events_page(
         "now": datetime.utcnow().isoformat()
     })
 
-@router.get("/models", response_class=HTMLResponse)
+@router.get("/models", response_class=HTMLResponse, include_in_schema=False)
 async def models_page(request: Request):
     """ML models status page."""
     models_status = get_models_status()
@@ -558,29 +711,61 @@ async def models_page(request: Request):
     })
 
 
-# JSON API endpoints for polling
-@router.get("/api/v1/stats")
+# =====================================================
+# JSON API Endpoints (documented in Swagger)
+# =====================================================
+
+@router.get(
+    "/api/v1/stats",
+    tags=["Dashboard"],
+    summary="Dashboard statistics",
+    description="Returns aggregate counts: total events, detections (overall and last 24 h), "
+                "total devices, breakdowns by event type, model, and severity.",
+    response_model=StatsResponse,
+)
 async def api_stats(session: AsyncSession = Depends(get_session)):
     """Get dashboard stats as JSON."""
     return await get_stats(session)
 
 
-@router.get("/api/v1/recent-detections")
+@router.get(
+    "/api/v1/recent-detections",
+    tags=["Incidents"],
+    summary="Recent detections",
+    description="Returns the most recent detections ordered by last activity. "
+                "Useful for live-feed widgets.",
+    response_model=List[DetectionItem],
+)
 async def api_recent_detections(
-    limit: int = Query(10, ge=1, le=50),
+    limit: int = Query(10, ge=1, le=50, description="Max items to return"),
     session: AsyncSession = Depends(get_session)
 ):
     """Get recent detections as JSON."""
     return await get_recent_detections(session, limit=limit)
 
 
-@router.get("/api/v1/devices")
+@router.get(
+    "/api/v1/devices",
+    tags=["Devices"],
+    summary="List all devices",
+    description="Returns every registered sensor/device with online status, approval status, "
+                "and alert counts for the last 1 h and 24 h.",
+    response_model=List[DeviceSummaryItem],
+)
 async def api_devices(session: AsyncSession = Depends(get_session)):
     """Get devices summary as JSON."""
     return await get_devices_summary(session)
 
 
-@router.get("/api/v1/devices/{device_id}")
+@router.get(
+    "/api/v1/devices/{device_id}",
+    tags=["Devices"],
+    summary="Device detail",
+    description="Returns profile, recent alerts (limit 50), and per-label alert statistics "
+                "for a single device.",
+    response_model=DeviceDetailResponse,
+    responses={404: {"model": ErrorResponse, "description": "Device not found"}},
+)
 async def api_device_detail(
     device_id: str,
     session: AsyncSession = Depends(get_session)
@@ -592,7 +777,14 @@ async def api_device_detail(
     return data
 
 
-@router.get("/api/v1/dashboard/analytics")
+@router.get(
+    "/api/v1/dashboard/analytics",
+    tags=["Dashboard"],
+    summary="Dashboard analytics",
+    description="Returns chart-ready data for: detection timeline (hourly), severity breakdown, "
+                "top 8 attack types, top 8 source IPs, top 8 devices, and aggregate summary.",
+    response_model=DashboardAnalyticsResponse,
+)
 async def api_dashboard_analytics(
     window: str = Query("24h", description="Time window: 24h, 12h, 6h, 1h"),
     session: AsyncSession = Depends(get_session)
@@ -623,7 +815,14 @@ async def api_dashboard_analytics(
     return analytics
 
 
-@router.get("/api/v1/health/models")
+@router.get(
+    "/api/v1/health/models",
+    tags=["Health"],
+    summary="ML models health",
+    description="Returns load status and configuration for every ML model "
+                "(SSH LSTM, Network ML).  Network ML is currently REMOVED.",
+    response_model=ModelsHealthResponse,
+)
 async def api_health_models():
     """
     Get ML models health status and detector counters.
@@ -642,7 +841,7 @@ async def api_health_models():
 # REPORTS PAGE
 # =====================================================
 
-@router.get("/reports", response_class=HTMLResponse)
+@router.get("/reports", response_class=HTMLResponse, include_in_schema=False)
 async def reports_page(
     request: Request,
     report_type: Optional[str] = Query("auth"),
@@ -721,13 +920,23 @@ async def reports_page(
 # REPORTS EXPORT API
 # =====================================================
 
-@router.get("/api/v1/reports/export")
+@router.get(
+    "/api/v1/reports/export",
+    tags=["Reports"],
+    summary="Export detections report",
+    description="Download detections as a CSV or XLSX file. Maximum 5 000 rows per export. "
+                "Use query params to filter by type, severity, device, and time range.",
+    responses={
+        200: {"description": "File download (CSV or XLSX)"},
+        422: {"model": ReportExportError, "description": "Invalid report type or format"},
+    },
+)
 async def export_report(
     type: str = Query(..., description="Report type: auth, network, or device"),
     format: str = Query("csv", description="Export format: csv or xlsx"),
-    severity: Optional[str] = Query(None),
-    device_id: Optional[str] = Query(None),
-    last_minutes: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None, description="Filter by severity level"),
+    device_id: Optional[str] = Query(None, description="Filter by device ID"),
+    last_minutes: Optional[str] = Query(None, description="Only include last N minutes"),
     session: AsyncSession = Depends(get_session)
 ):
     """

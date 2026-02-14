@@ -39,6 +39,7 @@ services:
       ANALYZER_PORT: ${ANALYZER_PORT:-8000}
       # Optional override (leave empty for auto-detect)
       DEVICE_IP: ${DEVICE_IP:-}
+      TZ: Asia/Kuwait
     volumes:
       - /var/log/auth.log:/var/log/auth.log:ro
       - ./agents/common:/app/common:ro
@@ -60,6 +61,7 @@ services:
     environment:
       SURICATA_IFACE: ${NET_IFACE:-ens33}
       MAX_EVE_MB: ${SURICATA_MAX_EVE_MB:-200}
+      TZ: Asia/Kuwait
     volumes:
       - ./services/suricata/etc/suricata.yaml:/etc/suricata/suricata.yaml:ro
       - ./services/suricata/log:/var/log/suricata
@@ -96,6 +98,7 @@ services:
       NET_IFACE: ${NET_IFACE:-ens33}
       # Suricata-specific
       SURICATA_EVE_PATH: /var/log/suricata/eve.json
+      TZ: Asia/Kuwait
     volumes:
       - ./services/suricata/log:/var/log/suricata:ro
       - ./agents/common:/app/common:ro

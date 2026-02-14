@@ -3,70 +3,62 @@
 # ==============================================================================
 # Suricata Configuration - Analytical-Intelligence
 # ==============================================================================
-# IDS mode configuration optimized for eve-log output to collector agent
+# IDS mode, LOCAL RULES ONLY, optimized for eve-log output to collector agent.
+# Interface is passed via CLI (--af-packet=), NOT set here.
 # ==============================================================================
 
-# Logging outputs
+# ── Logging Outputs ──────────────────────────────────────────────────────────
+
 outputs:
-  # EVE JSON output - primary output for collector agent
   - eve-log:
       enabled: yes
       filetype: regular
       filename: /var/log/suricata/eve.json
-      
-      # Rotate logs (managed by entrypoint.sh)
-      rotate-interval: day
-      
-      # Event types to log
+      pcap-file: false
+      community-id: true
       types:
         - alert:
             tagged-packets: yes
             metadata: yes
-        # Optional: enable these for richer context
-        # - dns
-        # - http:
-        #     extended: yes
-        # - tls:
-        #     extended: yes
-        # - flow
+            payload: yes
+            payload-printable: yes
+            packet: yes
+            http-body: yes
+            http-body-printable: yes
+        - stats:
+            totals: yes
+            threads: no
+            deltas: yes
 
-  # Fast log for quick reference
   - fast:
       enabled: yes
       filename: /var/log/suricata/fast.log
       append: yes
 
-  # Stats for monitoring
   - stats:
       enabled: yes
       filename: /var/log/suricata/stats.log
-      interval: 60
+      interval: 30
       append: yes
 
-# Packet acquisition
-af-packet:
-  - interface: default
-    threads: auto
-    cluster-id: 99
-    cluster-type: cluster_flow
-    defrag: yes
-    use-mmap: yes
-    tpacket-v3: yes
+# ── Global Stats Config (Suricata 8 requirement) ────────────────────────────
 
-# Rule files (LOCAL ONLY - no ET feeds)
+stats:
+  enabled: yes
+  interval: 30
+
+# ── Rules ────────────────────────────────────────────────────────────────────
+
 default-rule-path: /var/lib/suricata/rules
 rule-files:
   - local.rules
 
-# Classification and reference config
-classification-file: /etc/suricata/classification.config
-reference-config-file: /etc/suricata/reference.config
+# ── Network Variables ────────────────────────────────────────────────────────
 
-# Vars for rules (commonly used networks)
 vars:
   address-groups:
     HOME_NET: "[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]"
-    EXTERNAL_NET: "!$HOME_NET"
+    EXTERNAL_NET: "any"
     HTTP_SERVERS: "$HOME_NET"
     SMTP_SERVERS: "$HOME_NET"
     SQL_SERVERS: "$HOME_NET"
@@ -91,18 +83,19 @@ vars:
     VXLAN_PORTS: 4789
     TEREDO_PORTS: 3544
 
-# Host OS policy
+# ── Host OS Policy ──────────────────────────────────────────────────────────
+
 host-os-policy:
   windows: [0.0.0.0/0]
-  linux: []
 
-# Stream handling
+# ── Stream Engine ────────────────────────────────────────────────────────────
+
 stream:
   memcap: 256mb
   prealloc-sessions: 2048
-  midstream: false
-  async-oneside: false
-  checksum-validation: yes
+  midstream: true
+  async-oneside: true
+  checksum-validation: no
   inline: no
   reassembly:
     memcap: 512mb
@@ -111,13 +104,14 @@ stream:
     toclient-chunk-size: 2560
     randomize-chunk-size: yes
 
-# Flow settings
+# ── Flow Engine ──────────────────────────────────────────────────────────────
+
 flow:
   memcap: 256mb
   hash-size: 65536
   prealloc: 10000
   emergency-recovery: 30
-  
+
 flow-timeouts:
   default:
     new: 30
@@ -129,7 +123,8 @@ flow-timeouts:
     emergency-closed: 0
     emergency-bypassed: 50
 
-# Defrag
+# ── Defragmentation ──────────────────────────────────────────────────────────
+
 defrag:
   memcap: 64mb
   hash-size: 65536
@@ -138,7 +133,8 @@ defrag:
   prealloc: yes
   timeout: 60
 
-# Detection engine
+# ── Detection Engine ─────────────────────────────────────────────────────────
+
 detect:
   profile: medium
   custom-values:
@@ -147,12 +143,14 @@ detect:
   sgh-mpm-context: auto
   inspection-recursion-limit: 3000
 
-# Threading
+# ── Threading ────────────────────────────────────────────────────────────────
+
 threading:
   set-cpu-affinity: no
   detect-thread-ratio: 1.0
 
-# Logging
+# ── Logging ──────────────────────────────────────────────────────────────────
+
 logging:
   default-log-level: notice
   outputs:
@@ -163,20 +161,39 @@ logging:
         level: info
         filename: /var/log/suricata/suricata.log
 
-# App layer protocols
+# ── Application Layer Protocols ──────────────────────────────────────────────
+
 app-layer:
   protocols:
+    http:
+      enabled: yes
     tls:
       enabled: yes
       detection-ports:
         dp: 443
-    http:
-      enabled: yes
     dns:
       enabled: yes
+      tcp:
+        enabled: yes
+      udp:
+        enabled: yes
     ssh:
       enabled: yes
     smtp:
       enabled: yes
     ftp:
+      enabled: yes
+    tftp:
+      enabled: yes
+    smb:
+      enabled: yes
+    nfs:
+      enabled: yes
+    ntp:
+      enabled: yes
+    dhcp:
+      enabled: yes
+    krb5:
+      enabled: yes
+    ikev2:
       enabled: yes

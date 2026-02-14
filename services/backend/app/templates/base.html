@@ -108,14 +108,15 @@
                     </ul>
                 </li>
 
-                <li class="nav-item">
+                <!-- Hide Models ....Amr -->
+                <!-- <li class="nav-item">
                     <a href="/models" class="nav-link {% if page_title == 'Models' %}active{% endif %}">
                         <span class="nav-icon"><svg class="icon">
                                 <use xlink:href="/static/icons.svg#icon-models" />
                             </svg></span>
                         <span class="nav-text">Models</span>
                     </a>
-                </li>
+                </li> -->
                 <li class="nav-item">
                     <a href="/reports" class="nav-link {% if page_title == 'Reports' %}active{% endif %}">
                         <span class="nav-icon"><svg class="icon">
@@ -157,9 +158,10 @@
                     <span class="toggle-slider"></span>
                 </label>
                 <select id="autoRefreshInterval" class="refresh-select">
+                    <option value="1000">1s</option>
+                    <option value="5000">5s</option>
                     <option value="10000">10s</option>
                     <option value="30000" selected>30s</option>
-                    <option value="60000">60s</option>
                 </select>
                 <button id="manualRefresh" class="btn-icon" title="Refresh Now">
                     <svg class="icon">

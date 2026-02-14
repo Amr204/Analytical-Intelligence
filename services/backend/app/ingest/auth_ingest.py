@@ -15,10 +15,22 @@ from app.detectors.ssh_lstm_detector import analyze_auth_event
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/ingest", tags=["ingestion"])
+router = APIRouter(prefix="/api/v1/ingest", tags=["Ingestion"])
 
 
-@router.post("/auth", response_model=IngestResponse)
+@router.post(
+    "/auth",
+    response_model=IngestResponse,
+    summary="Ingest auth.log event",
+    description="Submit a single auth.log line from a sensor agent. "
+                "The backend stores the raw event and runs SSH LSTM anomaly detection. "
+                "Device must have approval_status='allowed' for events to be stored.",
+    responses={
+        200: {"description": "Event accepted or rejected (always 200 to prevent sensor retries)"},
+        401: {"description": "Invalid or missing API key"},
+        500: {"description": "Internal processing error"},
+    },
+)
 async def ingest_auth_event(
     payload: AuthEventPayload,
     api_key: str = Depends(verify_api_key),

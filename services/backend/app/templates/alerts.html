@@ -9,9 +9,28 @@
         <p class="subtitle">All detections from SSH LSTM and Suricata IDS</p>
     </div>
 
+    <!-- Tab Switcher -->
+    <div class="tab-switcher">
+        <a href="?view=incidents{{ pagination.query_string | replace('view=raw', '') | replace('view=incidents', '') }}"
+            class="tab-btn{% if view == 'incidents' %} active{% endif %}">
+            <svg class="icon icon-sm">
+                <use xlink:href="/static/icons.svg#icon-layers" />
+            </svg>
+            INCIDENTS
+        </a>
+        <a href="?view=raw{{ pagination.query_string | replace('view=raw', '') | replace('view=incidents', '') }}"
+            class="tab-btn{% if view == 'raw' %} active{% endif %}">
+            <svg class="icon icon-sm">
+                <use xlink:href="/static/icons.svg#icon-list" />
+            </svg>
+            RAW LOGS
+        </a>
+    </div>
+
     <!-- Filters -->
     <div class="filters-card">
         <form method="get" class="filters-form">
+            <input type="hidden" name="view" value="{{ view }}">
             <div class="filter-group">
                 <label for="severity">Severity</label>
                 <select name="severity" id="severity">
@@ -36,12 +55,12 @@
                 <label for="label">Attack Type</label>
                 <select name="label" id="label">
                     <option value="">All</option>
-                    <option value="DoS" {% if filters.label=='DoS' %}selected{% endif %}>DoS</option>
                     <option value="DDoS" {% if filters.label=='DDoS' %}selected{% endif %}>DDoS</option>
-                    <option value="Port Scanning" {% if filters.label=='Port Scanning' %}selected{% endif %}>Port
-                        Scanning</option>
-                    <option value="Brute Force" {% if filters.label=='Brute Force' %}selected{% endif %}>Brute Force
-                    </option>
+                    <option value="DoS" {% if filters.label=='DoS' %}selected{% endif %}>DoS</option>
+                    <option value="PortScan" {% if filters.label=='PortScan' %}selected{% endif %}>PortScan</option>
+                    <option value="Botnet" {% if filters.label=='Botnet' %}selected{% endif %}>Botnet</option>
+                    <option value="WebAttack" {% if filters.label=='WebAttack' %}selected{% endif %}>WebAttack</option>
+                    <option value="Recon" {% if filters.label=='Recon' %}selected{% endif %}>Recon</option>
                     <option value="SSH" {% if filters.label=='SSH' %}selected{% endif %}>SSH (LSTM)</option>
                 </select>
             </div>
@@ -65,25 +84,111 @@
                     <option value="1440" {% if filters.last_minutes==1440 %}selected{% endif %}>Last 24 hours</option>
                 </select>
             </div>
+            {% if view == 'incidents' %}
+            <div class="filter-group">
+                <label for="window_minutes">Group Window</label>
+                <select name="window_minutes" id="window_minutes">
+                    <option value="1" {% if filters.window_minutes==1 %}selected{% endif %}>1 min</option>
+                    <option value="5" {% if filters.window_minutes==5 %}selected{% endif %}>5 min</option>
+                    <option value="15" {% if filters.window_minutes==15 %}selected{% endif %}>15 min</option>
+                    <option value="30" {% if filters.window_minutes==30 %}selected{% endif %}>30 min</option>
+                    <option value="60" {% if filters.window_minutes==60 %}selected{% endif %}>1 hour</option>
+                </select>
+            </div>
+            {% endif %}
             <button type="submit" class="btn btn-primary">
                 <svg class="icon">
                     <use xlink:href="/static/icons.svg#icon-filter" />
                 </svg>
                 Apply
             </button>
-            <a href="/alerts" class="btn btn-secondary">Clear</a>
+            <a href="/alerts?view={{ view }}" class="btn btn-secondary">Clear</a>
         </form>
     </div>
 
-    <!-- Results Count -->
+    <!-- Results Info with Pagination Controls -->
     <div class="results-info">
-        <span>Showing {{ detections|length }} alerts</span>
+        <span>
+            {% if view == 'incidents' %}
+            Showing {{ incidents|length }} incidents ({{ pagination.total_count }} total)
+            {% else %}
+            Showing {{ detections|length }} alerts ({{ pagination.total_count }} total)
+            {% endif %}
+        </span>
         {% if filters.device_id %}
         <span class="filter-tag">Device: {{ filters.device_id }}</span>
         {% endif %}
+        <div class="per-page-selector">
+            <label for="per_page_select">Per page:</label>
+            <select id="per_page_select" onchange="changePerPage(this.value)">
+                <option value="10" {% if pagination.per_page==10 %}selected{% endif %}>10</option>
+                <option value="25" {% if pagination.per_page==25 %}selected{% endif %}>25</option>
+                <option value="50" {% if pagination.per_page==50 %}selected{% endif %}>50</option>
+            </select>
+        </div>
     </div>
 
-    <!-- Alerts Table -->
+    {% if view == 'incidents' %}
+    <!-- INCIDENTS Table -->
+    <div class="section-card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Incident</th>
+                    <th>Window</th>
+                    <th>Severity</th>
+                    <th>Model</th>
+                    <th>Label</th>
+                    <th>Destination</th>
+                    <th>Device</th>
+                    <th>Count</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inc in incidents %}
+                <tr class="severity-row-{{ inc.severity|default('low')|lower }}">
+                    <td><code class="incident-id">{{ inc.incident_id }}</code></td>
+                    <td class="timestamp">{{ inc.window_fmt }}</td>
+                    <td><span class="severity-badge {{ inc.severity|default('low')|lower }}">{{
+                            inc.severity|default('N/A') }}</span></td>
+                    <td><span class="model-badge {{ inc.model_name|default('unknown') }}">{{
+                            inc.model_name|default('unknown') }}</span></td>
+                    <td class="label-cell" title="{{ inc.label|default('') }}">{{ (inc.label or '-')[:40] }}{% if
+                        inc.label and inc.label|length > 40 %}...{% endif %}</td>
+                    <td class="flow-cell">{% if inc.dst_ip %}{{ inc.dst_ip }}:{{ inc.dst_port|default('?') }}{% else
+                        %}-{% endif %}</td>
+                    <td><a href="/devices/{{ inc.device_id|default('unknown') }}">{{ inc.device_id|default('N/A') }}</a>
+                    </td>
+                    <td><span class="incident-count-badge">{{ inc.detection_count }}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-info" data-label="{{ inc.label }}"
+                            data-severity="{{ inc.severity }}" data-model="{{ inc.model_name }}"
+                            data-device="{{ inc.device_id }}" data-window-start="{{ inc.window_start }}"
+                            data-window-end="{{ inc.window_end }}" data-dst-ip="{{ inc.dst_ip or '' }}"
+                            data-dst-port="{{ inc.dst_port or '' }}" onclick="showIncidentLogs(this)">
+                            <svg class="icon icon-sm">
+                                <use xlink:href="/static/icons.svg#icon-eye" />
+                            </svg>
+                            Logs
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="empty-state">
+                        <svg class="icon icon-xl">
+                            <use xlink:href="/static/icons.svg#icon-check" />
+                        </svg>
+                        <span>No incidents found matching the filters</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <!-- RAW LOGS Table -->
     <div class="section-card">
         <table class="data-table">
             <thead>
@@ -136,17 +241,18 @@
             </tbody>
         </table>
     </div>
+    {% endif %}
 
     <!-- Pagination -->
     {% if pagination %}
     <div class="pagination">
-        {% if pagination.page > 1 %}
-        <a href="?page=1{{ pagination.query_string }}" class="page-btn">
+        {% if pagination.has_prev %}
+        <a href="?page=1{{ pagination.query_string }}" class="page-btn" title="First">
             <svg class="icon icon-sm">
                 <use xlink:href="/static/icons.svg#icon-chevrons-left" />
             </svg>
         </a>
-        <a href="?page={{ pagination.page - 1 }}{{ pagination.query_string }}" class="page-btn">
+        <a href="?page={{ pagination.page - 1 }}{{ pagination.query_string }}" class="page-btn" title="Previous">
             <svg class="icon icon-sm">
                 <use xlink:href="/static/icons.svg#icon-chevron-left" />
             </svg>
@@ -155,23 +261,23 @@
 
         <span class="page-info">Page {{ pagination.page }} of {{ pagination.total_pages }}</span>
 
-        {% if pagination.page < pagination.total_pages %} <a
-            href="?page={{ pagination.page + 1 }}{{ pagination.query_string }}" class="page-btn">
+        {% if pagination.has_next %}
+        <a href="?page={{ pagination.page + 1 }}{{ pagination.query_string }}" class="page-btn" title="Next">
             <svg class="icon icon-sm">
                 <use xlink:href="/static/icons.svg#icon-chevron-right" />
             </svg>
-            </a>
-            <a href="?page={{ pagination.total_pages }}{{ pagination.query_string }}" class="page-btn">
-                <svg class="icon icon-sm">
-                    <use xlink:href="/static/icons.svg#icon-chevrons-right" />
-                </svg>
-            </a>
-            {% endif %}
+        </a>
+        <a href="?page={{ pagination.total_pages }}{{ pagination.query_string }}" class="page-btn" title="Last">
+            <svg class="icon icon-sm">
+                <use xlink:href="/static/icons.svg#icon-chevrons-right" />
+            </svg>
+        </a>
+        {% endif %}
     </div>
     {% endif %}
 </div>
 
-<!-- Details Modal -->
+<!-- Details Modal (for raw logs) -->
 <div id="details-modal" class="modal">
     <div class="modal-content">
         <button class="modal-close" onclick="closeModal()">
@@ -181,6 +287,20 @@
         </button>
         <h3>Alert Details</h3>
         <pre id="details-json"></pre>
+    </div>
+</div>
+
+<!-- Incident Logs Modal -->
+<div id="incident-logs-modal" class="modal">
+    <div class="modal-content modal-lg">
+        <button class="modal-close" onclick="closeIncidentLogsModal()">
+            <svg class="icon">
+                <use xlink:href="/static/icons.svg#icon-x" />
+            </svg>
+        </button>
+        <h3>Incident Logs</h3>
+        <div id="incident-logs-loading" style="display:none;">Loading...</div>
+        <div id="incident-logs-content"></div>
     </div>
 </div>
 
@@ -198,10 +318,93 @@
         document.getElementById('details-modal').style.display = 'none';
     }
 
+    function closeIncidentLogsModal() {
+        document.getElementById('incident-logs-modal').style.display = 'none';
+    }
+
+    async function showIncidentLogs(btn) {
+        const modal = document.getElementById('incident-logs-modal');
+        const loading = document.getElementById('incident-logs-loading');
+        const content = document.getElementById('incident-logs-content');
+
+        // Get incident data from button attributes
+        const params = new URLSearchParams({
+            label: btn.dataset.label,
+            severity: btn.dataset.severity,
+            model_name: btn.dataset.model,
+            device_id: btn.dataset.device,
+            window_start: btn.dataset.windowStart,
+            window_end: btn.dataset.windowEnd,
+        });
+
+        if (btn.dataset.dstIp) params.append('dst_ip', btn.dataset.dstIp);
+        if (btn.dataset.dstPort) params.append('dst_port', btn.dataset.dstPort);
+
+        // Show modal with loading state
+        modal.style.display = 'block';
+        loading.style.display = 'block';
+        content.innerHTML = '';
+
+        try {
+            const response = await fetch(`/api/v1/incidents/logs?${params.toString()}`);
+            const data = await response.json();
+            loading.style.display = 'none';
+
+            if (data.logs && data.logs.length > 0) {
+                // Show count info with total if available
+                let countInfo = `Found ${data.count} events`;
+                if (data.total_count && data.total_count > data.count) {
+                    countInfo = `Showing ${data.count} of ${data.total_count} events`;
+                }
+                let html = `<p class="results-info">${countInfo}</p>`;
+
+                // Include protocol column for Suricata
+                const isSuricata = data.source === 'raw_events';
+                if (isSuricata) {
+                    html += '<table class="data-table data-table-compact"><thead><tr><th>Time</th><th>Source</th><th>Dest</th><th>Proto</th><th>Signature</th></tr></thead><tbody>';
+                } else {
+                    html += '<table class="data-table data-table-compact"><thead><tr><th>Time</th><th>Source</th><th>Label</th></tr></thead><tbody>';
+                }
+
+                for (const log of data.logs) {
+                    const ts = (log.ts || '').substring(0, 19);
+                    const src = log.src_ip ? `${log.src_ip}:${log.src_port || '?'}` : '-';
+                    const label = (log.label || log.signature || '-').substring(0, 40);
+
+                    if (isSuricata) {
+                        const dst = log.dst_ip ? `${log.dst_ip}:${log.dst_port || '?'}` : '-';
+                        const proto = log.proto || '-';
+                        html += `<tr><td class="timestamp">${ts}</td><td>${src}</td><td>${dst}</td><td>${proto}</td><td title="${log.label || ''}">${label}</td></tr>`;
+                    } else {
+                        html += `<tr><td class="timestamp">${ts}</td><td>${src}</td><td>${label}</td></tr>`;
+                    }
+                }
+                html += '</tbody></table>';
+                content.innerHTML = html;
+            } else {
+                content.innerHTML = '<p class="empty-state">No logs found for this incident</p>';
+            }
+        } catch (err) {
+            loading.style.display = 'none';
+            content.innerHTML = `<p class="error-state">Error loading logs: ${err.message}</p>`;
+        }
+    }
+
+    function changePerPage(value) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('per_page', value);
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    }
+
     window.onclick = function (event) {
-        const modal = document.getElementById('details-modal');
-        if (event.target === modal) {
-            modal.style.display = 'none';
+        const detailsModal = document.getElementById('details-modal');
+        const logsModal = document.getElementById('incident-logs-modal');
+        if (event.target === detailsModal) {
+            detailsModal.style.display = 'none';
+        }
+        if (event.target === logsModal) {
+            logsModal.style.display = 'none';
         }
     }
 
@@ -209,6 +412,7 @@
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
             closeModal();
+            closeIncidentLogsModal();
         }
     });
 </script>

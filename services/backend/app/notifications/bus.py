@@ -135,11 +135,12 @@ class NotificationBus:
 
             # 2. Deduplication check
             alert_hash = self._compute_alert_hash(alert)
+            dedup_window = self._get_dedup_window(alert)
             now = time.time()
             self._cleanup_dedup_cache(now)
 
             if alert_hash in self._dedup_cache:
-                logger.debug(f"Alert skipped (duplicate within {self._dedup_window}s)")
+                logger.debug(f"Alert skipped (duplicate within {dedup_window}s)")
                 return
 
             # 3. Rate limit check
@@ -153,7 +154,7 @@ class NotificationBus:
 
             if success:
                 # Record for dedup and rate limit
-                self._dedup_cache[alert_hash] = now + self._dedup_window
+                self._dedup_cache[alert_hash] = now + dedup_window
                 self._send_timestamps.append(now)
 
         except Exception as e:
@@ -186,18 +187,43 @@ class NotificationBus:
         return False
 
     def _compute_alert_hash(self, alert: DetectionAlert) -> str:
-        """Compute dedup hash from alert key fields."""
+        """
+        Compute dedup hash from alert key fields.
+        
+        For suricata model: exclude src_ip to prevent DDoS spam from many sources.
+        For other models (e.g., ssh_lstm): include src_ip to keep brute force sources distinct.
+        """
+        model_name = alert.get("model_name", "")
+        
+        # Base key parts (always included)
         key_parts = [
             alert.get("label", ""),
             alert.get("severity", ""),
             alert.get("device_id", ""),
-            alert.get("src_ip", ""),
             alert.get("dst_ip", ""),
             str(alert.get("dst_port", "")),
-            alert.get("model_name", ""),
+            model_name,
         ]
+        
+        # Include src_ip only for non-suricata models
+        # This prevents DDoS spam where many source IPs hit the same target
+        if model_name != "suricata":
+            key_parts.append(alert.get("src_ip", ""))
+        
         key_str = "|".join(key_parts)
         return hashlib.md5(key_str.encode()).hexdigest()
+
+    def _get_dedup_window(self, alert: DetectionAlert) -> int:
+        """
+        Get the dedup window for an alert based on its model.
+        
+        Suricata alerts get a longer window (5 min) to handle DDoS bursts.
+        Other models use the default window (60s).
+        """
+        model_name = alert.get("model_name", "")
+        if model_name == "suricata":
+            return settings.telegram_suricata_dedup_window_seconds
+        return settings.telegram_dedup_window_seconds
 
     def _cleanup_dedup_cache(self, now: float) -> None:
         """Remove expired entries from dedup cache."""

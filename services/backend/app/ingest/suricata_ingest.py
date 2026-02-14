@@ -16,7 +16,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/ingest", tags=["ingestion"])
+router = APIRouter(prefix="/api/v1/ingest", tags=["Ingestion"])
 
 
 def map_severity(suricata_severity: int) -> tuple[str, float]:
@@ -37,7 +37,65 @@ def map_severity(suricata_severity: int) -> tuple[str, float]:
         return ("LOW", 0.50)
 
 
-@router.post("/suricata", response_model=IngestResponse)
+def is_ai_local_rule(signature: str, sid: int) -> bool:
+    """
+    Check if alert is from our local AI rules (not ET/external noise).
+    
+    Accept if:
+    - Signature starts with "AI " (our naming convention)
+    - OR SID is in the local range (1000000-1009999)
+    """
+    if signature.startswith("AI "):
+        return True
+    if settings.suricata_local_sid_min <= sid <= settings.suricata_local_sid_max:
+        return True
+    return False
+
+
+def is_ddos_rule(signature: str) -> bool:
+    """
+    Check if this is a DDoS rule (distributed attack, destination-based).
+    For DDoS rules, we ignore src_ip in dedup key to aggregate multi-source attacks.
+    """
+    return "AI DDoS:" in signature
+
+
+def compute_bucket_window(ts: datetime, window_minutes: int) -> tuple[datetime, datetime]:
+    """
+    Compute the fixed time bucket for a given timestamp.
+    
+    Args:
+        ts: Alert timestamp
+        window_minutes: Bucket size in minutes (e.g., 5)
+    
+    Returns:
+        (bucket_start, bucket_end) - both are timezone-aware if ts is
+    """
+    # Truncate to minute boundary
+    bucket_start = ts.replace(second=0, microsecond=0)
+    # Align to window boundary (e.g., 5-min buckets: 00:00, 00:05, 00:10, ...)
+    minutes_since_midnight = bucket_start.hour * 60 + bucket_start.minute
+    bucket_offset = minutes_since_midnight % window_minutes
+    bucket_start = bucket_start - timedelta(minutes=bucket_offset)
+    bucket_end = bucket_start + timedelta(minutes=window_minutes)
+    return bucket_start, bucket_end
+
+
+@router.post(
+    "/suricata",
+    response_model=IngestResponse,
+    summary="Ingest Suricata IDS alert",
+    description="Submit a Suricata alert from a sensor agent. "
+                "The backend stores the raw event, maps severity, and applies "
+                "bucket-based deduplication (default 5-min windows). "
+                "DDoS rules ignore src_ip for multi-source aggregation. "
+                "Device must have approval_status='allowed'.",
+    responses={
+        200: {"description": "Alert accepted or rejected (always 200 to prevent sensor retries)"},
+        401: {"description": "Invalid or missing API key"},
+        500: {"description": "Internal processing error"},
+    },
+)
 async def ingest_suricata_alert(
     payload: SuricataAlertPayload,
     api_key: str = Depends(verify_api_key),
@@ -45,8 +103,15 @@ async def ingest_suricata_alert(
 ):
     """
     Ingest a Suricata IDS alert.
-    Stores the raw event and creates a detection.
+    Stores the raw event and creates/updates a detection.
     Device must be 'allowed' to store events.
+    
+    Deduplication Strategy:
+    - Uses fixed time-bucket windows (default 5 min) instead of sliding windows
+    - A continuous attack produces one detection per bucket, not one forever-growing row
+    - DDoS rules ignore src_ip (aggregate multi-source attacks)
+    - Other rules include src_ip in dedup key
+    - Only 'ts' is set on INSERT (first alert in bucket), not on UPDATE
     """
     try:
         # Parse timestamp
@@ -65,9 +130,10 @@ async def ingest_suricata_alert(
         # Check device approval status
         approval_status = await get_device_approval_status(session, payload.device_id)
         if approval_status != 'allowed':
-            # Reject but return 200 to prevent sensor retries
+            # Reject but return 200 to prevent sensor retries (which would just spam the logs)
+            # LOG THIS CRITICAL WARNING so admin knows why alerts are missing
             message = "Device pending approval" if approval_status == 'pending' else "Device blocked"
-            logger.info(f"Suricata event rejected: device={payload.device_id}, status={approval_status}")
+            logger.warning(f"⛔ SURICATA ALERT REJECTED: device={payload.device_id}, status={approval_status}. Go to /devices to approve this sensor.")
             return IngestResponse(
                 status="rejected",
                 event_id=None,
@@ -86,15 +152,6 @@ async def ingest_suricata_alert(
             **raw
         }
         
-        # Store raw event
-        event_id = await insert_raw_event(
-            session,
-            ts=ts,
-            device_id=payload.device_id,
-            event_type="suricata",
-            payload=full_raw
-        )
-        
         # Extract fields for detection
         signature = alert.get("signature", f"sid:{alert.get('sid', 'unknown')}")
         category = alert.get("category", "Unknown")
@@ -111,6 +168,35 @@ async def ingest_suricata_alert(
         dst_port = raw.get("dest_port", raw.get("dst_port", 0))
         proto = raw.get("proto", "")
         flow_id = raw.get("flow_id")
+        
+        # --- Allowlist Check ---
+        # Only process alerts from our local AI rules
+        if not is_ai_local_rule(signature, sid):
+            # Store raw event for audit but don't create detection or send Telegram
+            event_id = await insert_raw_event(
+                session,
+                ts=ts,
+                device_id=payload.device_id,
+                event_type="suricata",
+                payload=full_raw
+            )
+            await session.commit()
+            logger.debug(f"Suricata event stored (non-AI rule, no detection): {signature}")
+            return IngestResponse(
+                status="accepted",
+                event_id=event_id,
+                detection_id=None,
+                message="Raw event stored (external rule, no detection created)"
+            )
+        
+        # Store raw event
+        event_id = await insert_raw_event(
+            session,
+            ts=ts,
+            device_id=payload.device_id,
+            event_type="suricata",
+            payload=full_raw
+        )
         
         # Map severity
         severity, score = map_severity(suricata_severity)
@@ -132,47 +218,82 @@ async def ingest_suricata_alert(
             "suricata_severity": suricata_severity,
         }
         
-        # --- Deduplication Logic ---
-        # Check for existing detection with same signature and flow tuple
-        dedup_window = getattr(settings, 'suricata_dedup_window_seconds', 10)
-        dedup_cutoff = ts - timedelta(seconds=dedup_window)
+        # --- Bucket-Based Deduplication ---
+        rollup_minutes = settings.suricata_rollup_window_minutes
+        bucket_start, bucket_end = compute_bucket_window(ts, rollup_minutes)
         
-        dedup_query = text("""
-            SELECT id, occurrences 
-            FROM detections 
-            WHERE model_name = 'suricata'
-            AND label = :label
-            AND ts > :cutoff
-            AND src_ip = :src_ip
-            AND dst_ip = :dst_ip
-            AND dst_port = :dst_port
-            ORDER BY ts DESC 
-            LIMIT 1
-        """)
+        # Determine if DDoS (ignore src_ip in dedup)
+        ddos_mode = is_ddos_rule(signature)
         
-        result = await session.execute(dedup_query, {
-            "label": signature,
-            "cutoff": dedup_cutoff,
-            "src_ip": str(src_ip) if src_ip else "",
-            "dst_ip": str(dst_ip) if dst_ip else "",
-            "dst_port": int(dst_port) if dst_port else 0
-        })
+        # Build dedup query based on rule type
+        if ddos_mode:
+            # DDoS: dedup by (device_id, label, dst_ip, dst_port, bucket)
+            dedup_query = text("""
+                SELECT id, occurrences 
+                FROM detections 
+                WHERE model_name = 'suricata'
+                AND label = :label
+                AND device_id = :device_id
+                AND (dst_ip = :dst_ip OR (dst_ip IS NULL AND :dst_ip = ''))
+                AND (dst_port = :dst_port OR (dst_port IS NULL AND :dst_port = 0))
+                AND ts >= :bucket_start AND ts < :bucket_end
+                ORDER BY ts DESC 
+                LIMIT 1
+            """)
+            dedup_params = {
+                "label": signature,
+                "device_id": payload.device_id,
+                "dst_ip": str(dst_ip) if dst_ip else "",
+                "dst_port": int(dst_port) if dst_port else 0,
+                "bucket_start": bucket_start,
+                "bucket_end": bucket_end
+            }
+        else:
+            # Non-DDoS: include src_ip in dedup key
+            dedup_query = text("""
+                SELECT id, occurrences 
+                FROM detections 
+                WHERE model_name = 'suricata'
+                AND label = :label
+                AND device_id = :device_id
+                AND (src_ip = :src_ip OR (src_ip IS NULL AND :src_ip = ''))
+                AND (dst_ip = :dst_ip OR (dst_ip IS NULL AND :dst_ip = ''))
+                AND (dst_port = :dst_port OR (dst_port IS NULL AND :dst_port = 0))
+                AND ts >= :bucket_start AND ts < :bucket_end
+                ORDER BY ts DESC 
+                LIMIT 1
+            """)
+            dedup_params = {
+                "label": signature,
+                "device_id": payload.device_id,
+                "src_ip": str(src_ip) if src_ip else "",
+                "dst_ip": str(dst_ip) if dst_ip else "",
+                "dst_port": int(dst_port) if dst_port else 0,
+                "bucket_start": bucket_start,
+                "bucket_end": bucket_end
+            }
+        
+        result = await session.execute(dedup_query, dedup_params)
         existing = result.first()
         
         detection_id = None
+        is_new_detection = False
         
         if existing:
-            # Update existing detection
+            # Update existing detection within same bucket
+            # DO NOT update ts - keep the original first-seen timestamp for the bucket
             detection_id = existing[0]
             new_occurrences = (existing[1] or 1) + 1
             await session.execute(text("""
                 UPDATE detections 
-                SET occurrences = :occurrences, last_seen = :ts, ts = :ts
+                SET occurrences = :occurrences, 
+                    last_seen = :last_seen
                 WHERE id = :id
-            """), {"occurrences": new_occurrences, "ts": ts, "id": detection_id})
-            logger.info(f"Suricata detection DEDUP: {signature} (x{new_occurrences})")
+            """), {"occurrences": new_occurrences, "last_seen": ts, "id": detection_id})
+            logger.debug(f"Suricata detection DEDUP [{bucket_start.strftime('%H:%M')}-{bucket_end.strftime('%H:%M')}]: {signature} (x{new_occurrences})")
         else:
-            # Insert new detection
+            # Insert new detection for this bucket
+            is_new_detection = True
             detection_id = await insert_detection(
                 session,
                 ts=ts,
@@ -192,9 +313,9 @@ async def ingest_suricata_alert(
                 dst_port=int(dst_port) if dst_port else None,
                 proto=str(proto) if proto else None
             )
-            logger.info(f"Suricata detection: {signature} ({severity})")
+            logger.info(f"Suricata detection NEW [{bucket_start.strftime('%H:%M')}-{bucket_end.strftime('%H:%M')}]: {signature} ({severity})")
             
-            # Enqueue Telegram alert (non-blocking)
+            # Enqueue Telegram alert ONLY for NEW detections (not dedup updates)
             from app.notifications import get_notification_bus
             bus = get_notification_bus()
             if bus:
@@ -220,7 +341,7 @@ async def ingest_suricata_alert(
             status="accepted",
             event_id=event_id,
             detection_id=detection_id,
-            message="Suricata alert processed"
+            message="Suricata alert processed" + (" (new)" if is_new_detection else " (dedup)")
         )
 
     except Exception as e:

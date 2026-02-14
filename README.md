@@ -494,7 +494,13 @@ sudo ufw enable
 > **Open Sensor Server tab in MobaXterm**
 
 ### Step 1: Update and Install Docker
+# تثبيت وتشغيل nginx
+sudo apt update
+sudo apt install nginx
+sudo systemctl start nginx
 
+# إنشاء صفحة اختبار
+echo "<html><body>Test Server</body></html>" | sudo tee /var/www/html/index.html
 ```bash
 # Update system
 sudo apt update && sudo apt upgrade -y
@@ -963,10 +969,13 @@ Includes:
 ### Quick Fixes
 
 | Problem | Quick Fix |
-|---------|-----------|
+|---------|-----------
 | Dashboard doesn't open | `sudo ufw allow 8000` |
 | Sensor doesn't connect | Check `ANALYZER_HOST` in `.env` |
-| No alerts | Check `SURICATA_PROFILE` in `.env` |
+| No Suricata alerts | Check `docker logs ai_db-suricata` for rules loaded |
+| Suricata rules not loaded | Run `docker exec ai_db-suricata suricata -T -c /etc/suricata/suricata.yaml` |
+| Collector filtering all alerts | Set `SURICATA_ACCEPT_ALL=true` in `.env` for debugging |
+| eve.json not growing | Check interface: `docker logs ai_db-suricata \| grep interface` |
 | Container doesn't start | `docker compose logs backend` |
 | DNS fails during build | `bash scripts/docker_doctor.sh` or [use VPN](#-optional-vpn-for-updates) |
 

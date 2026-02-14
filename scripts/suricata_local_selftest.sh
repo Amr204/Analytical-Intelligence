@@ -58,7 +58,7 @@ echo ""
 echo -e "${YELLOW}[3/5] Checking loaded rules...${NC}"
 
 # Get rule count from container logs
-RULE_COUNT=$(docker logs ai_db-suricata 2>&1 | grep -oP "Active Rules: \K\d+" | tail -1 || echo "0")
+RULE_COUNT=$(docker logs ai_db-suricata 2>&1 | grep -oP "Rules: \K\d+" | tail -1 || echo "0")
 echo "    Local rules loaded: $RULE_COUNT"
 
 if [ "$RULE_COUNT" -gt 0 ]; then
@@ -74,8 +74,8 @@ echo ""
 echo -e "${YELLOW}[4/5] Checking alert signatures...${NC}"
 
 if [ -f "$EVE_FILE" ]; then
-    AI_ALERTS=$(grep -c '"signature":"AI ' "$EVE_FILE" 2>/dev/null || echo "0")
-    ET_ALERTS=$(grep -c '"signature":"ET ' "$EVE_FILE" 2>/dev/null || echo "0")
+    AI_ALERTS=$(grep -c '"signature": "AI ' "$EVE_FILE" 2>/dev/null || echo "0")
+    ET_ALERTS=$(grep -c '"signature": "ET ' "$EVE_FILE" 2>/dev/null || echo "0")
     
     echo "    AI-prefixed alerts: $AI_ALERTS"
     echo "    ET-prefixed alerts: $ET_ALERTS"
